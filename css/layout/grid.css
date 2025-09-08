@@ -1,0 +1,100 @@
+/* =====================================================
+   GRID.CSS - Grid Layout System
+   ===================================================== */
+
+/* ==================== Base Grid ==================== */
+.grid {
+  display: grid;
+  gap: var(--space-lg);
+}
+
+/* ==================== Itinerary Grid ==================== */
+.itinerary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: var(--space-lg);
+  padding: var(--space-2xl) 0;
+  width: 100%;
+}
+
+/* ==================== Grid Columns ==================== */
+.grid-cols-1 {
+  grid-template-columns: repeat(1, minmax(0, 1fr));
+}
+
+.grid-cols-2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.grid-cols-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.grid-cols-4 {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+/* ==================== Auto Grid ==================== */
+.grid-auto {
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+}
+
+.grid-auto-lg {
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+}
+
+/* ==================== Grid Gap ==================== */
+.gap-sm {
+  gap: var(--space-sm);
+}
+
+.gap-md {
+  gap: var(--space-md);
+}
+
+.gap-lg {
+  gap: var(--space-lg);
+}
+
+.gap-xl {
+  gap: var(--space-xl);
+}
+
+/* ==================== Responsive Grid ==================== */
+@media (max-width: 1024px) {
+  .itinerary-grid {
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  }
+  
+  .grid-cols-4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  
+  .grid-cols-3 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .itinerary-grid {
+    grid-template-columns: 1fr;
+    padding: var(--space-lg) 0;
+  }
+  
+  .grid-cols-2,
+  .grid-cols-3,
+  .grid-cols-4 {
+    grid-template-columns: 1fr;
+  }
+  
+  .grid-auto,
+  .grid-auto-lg {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .itinerary-grid {
+    gap: var(--space-md);
+  }
+}

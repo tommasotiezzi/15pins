@@ -1,0 +1,102 @@
+/* =====================================================
+   BADGES.CSS - Badge Components
+   ===================================================== */
+
+/* ==================== Base Badge ==================== */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 6px;
+  background: var(--danger);
+  color: var(--white);
+  font-size: var(--text-xs);
+  font-weight: var(--font-semibold);
+  border-radius: var(--radius-full);
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  line-height: 1;
+}
+
+.badge:empty {
+  display: none;
+}
+
+/* ==================== Badge Variants ==================== */
+.badge-primary {
+  background: var(--primary);
+}
+
+.badge-secondary {
+  background: var(--gray-500);
+}
+
+.badge-success {
+  background: var(--success);
+}
+
+.badge-danger {
+  background: var(--danger);
+}
+
+.badge-warning {
+  background: var(--warning);
+  color: var(--gray-900);
+}
+
+.badge-info {
+  background: var(--info);
+}
+
+/* ==================== Badge Sizes ==================== */
+.badge-sm {
+  min-width: 16px;
+  height: 16px;
+  font-size: 0.625rem;
+  padding: 0 4px;
+}
+
+.badge-lg {
+  min-width: 24px;
+  height: 24px;
+  font-size: var(--text-sm);
+  padding: 0 8px;
+}
+
+/* ==================== Badge Positions ==================== */
+.badge-top-left {
+  top: -4px;
+  left: -4px;
+  right: auto;
+}
+
+.badge-top-right {
+  top: -4px;
+  right: -4px;
+  left: auto;
+}
+
+.badge-bottom-left {
+  bottom: -4px;
+  left: -4px;
+  top: auto;
+  right: auto;
+}
+
+.badge-bottom-right {
+  bottom: -4px;
+  right: -4px;
+  top: auto;
+  left: auto;
+}
+
+/* ==================== Inline Badge ==================== */
+.badge-inline {
+  position: static;
+  display: inline-flex;
+  vertical-align: middle;
+  margin: 0 var(--space-xs);
+}
