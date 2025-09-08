@@ -154,6 +154,9 @@ const CreateController = (() => {
         showLoadingOverlay(`Loading Step ${toStep}...`);
         await loadStepData(toStep);
         
+        // Render the new step
+        renderStep(toStep);
+        
       } catch (error) {
         handleLoadError(error);
         isTransitioning = false;
@@ -162,10 +165,10 @@ const CreateController = (() => {
         hideLoadingOverlay();
         isTransitioning = false;
       }
+    } else if (!isGoingBack && !currentDraftId) {
+      // No draft yet (step 1 to 2), just render
+      renderStep(toStep);
     }
-    
-    // Render the new step
-    renderStep(toStep);
   };
 
   // ============= SAVE WITH TIMEOUT =============
