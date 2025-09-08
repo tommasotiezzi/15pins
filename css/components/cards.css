@@ -1,0 +1,268 @@
+/* =====================================================
+   CARDS.CSS - Card Components
+   ===================================================== */
+
+/* ==================== Base Card ==================== */
+.card {
+  background: var(--bg-primary);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+  transition: all var(--transition-base);
+}
+
+.card:hover {
+  box-shadow: var(--shadow-md);
+}
+
+/* ==================== Itinerary Card ==================== */
+.itinerary-card {
+  background: var(--bg-primary);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+  transition: all var(--transition-base);
+  cursor: pointer;
+  border: var(--border-width) solid transparent;
+  display: flex;
+  flex-direction: column;
+}
+
+.itinerary-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-lg);
+  border-color: var(--primary-alpha-20);
+}
+
+/* Card Image */
+.card-image {
+  position: relative;
+  height: 200px;
+  overflow: hidden;
+  background: var(--bg-tertiary);
+}
+
+.card-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform var(--transition-slow);
+}
+
+.itinerary-card:hover .card-image img {
+  transform: scale(1.05);
+}
+
+/* Card Badges */
+.card-badge {
+  position: absolute;
+  top: var(--space-md);
+  left: var(--space-md);
+  padding: var(--space-xs) var(--space-md);
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(8px);
+  border-radius: var(--radius-full);
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  color: var(--text-primary);
+}
+
+.card-price {
+  position: absolute;
+  top: var(--space-md);
+  right: var(--space-md);
+  padding: var(--space-xs) var(--space-md);
+  background: var(--primary);
+  color: var(--white);
+  border-radius: var(--radius-md);
+  font-weight: var(--font-bold);
+  font-size: var(--text-lg);
+}
+
+/* Card Content */
+.card-content {
+  padding: var(--space-lg);
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.card-title {
+  font-size: var(--text-lg);
+  font-weight: var(--font-semibold);
+  margin-bottom: var(--space-sm);
+  color: var(--text-primary);
+  line-height: var(--leading-tight);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.card-location {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  color: var(--text-light);
+  font-size: var(--text-sm);
+  margin-bottom: var(--space-md);
+}
+
+.card-location svg {
+  color: var(--secondary);
+  flex-shrink: 0;
+}
+
+/* Card Stops Preview */
+.card-stops {
+  margin-top: var(--space-md);
+  padding-top: var(--space-md);
+  border-top: var(--border-width) solid var(--border-light);
+  flex: 1;
+}
+
+.stop-preview {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-sm);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.stop-preview:last-child {
+  margin-bottom: 0;
+}
+
+.stop-icon {
+  font-size: var(--text-base);
+  width: 20px;
+  text-align: center;
+}
+
+/* Card Footer */
+.card-footer {
+  padding: var(--space-md) var(--space-lg);
+  border-top: var(--border-width) solid var(--border-light);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--bg-secondary);
+}
+
+/* Creator Info */
+.creator-info {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.creator-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-full);
+  background: var(--bg-tertiary);
+  object-fit: cover;
+}
+
+.creator-details {
+  display: flex;
+  flex-direction: column;
+}
+
+.creator-name {
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  color: var(--text-primary);
+}
+
+.card-stats {
+  font-size: var(--text-xs);
+  color: var(--text-light);
+}
+
+/* Card Actions */
+.card-actions {
+  display: flex;
+  gap: var(--space-sm);
+}
+
+/* ==================== Dashboard Cards ==================== */
+.stat-card {
+  background: var(--bg-primary);
+  padding: var(--space-lg);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  border: var(--border-width) solid var(--border-light);
+}
+
+.stat-card h3 {
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  color: var(--text-light);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: var(--space-sm);
+}
+
+.stat-card .value {
+  font-size: var(--text-3xl);
+  font-weight: var(--font-bold);
+  color: var(--text-primary);
+}
+
+.stat-card.primary .value {
+  color: var(--primary);
+}
+
+.stat-card.success .value {
+  color: var(--success);
+}
+
+.stat-card.warning .value {
+  color: var(--warning);
+}
+
+/* ==================== Empty State Card ==================== */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 300px;
+  padding: var(--space-2xl);
+  text-align: center;
+}
+
+.empty-state svg {
+  margin-bottom: var(--space-lg);
+  color: var(--text-lighter);
+}
+
+.empty-state h2 {
+  font-size: var(--text-xl);
+  font-weight: var(--font-semibold);
+  color: var(--text-primary);
+  margin-bottom: var(--space-sm);
+}
+
+.empty-state p {
+  color: var(--text-light);
+  margin-bottom: var(--space-lg);
+  max-width: 400px;
+}
+
+/* ==================== Responsive ==================== */
+@media (max-width: 640px) {
+  .card-content {
+    padding: var(--space-md);
+  }
+  
+  .card-footer {
+    padding: var(--space-sm) var(--space-md);
+  }
+  
+  .card-title {
+    font-size: var(--text-base);
+  }
+}
