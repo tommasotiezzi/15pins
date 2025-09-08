@@ -355,27 +355,20 @@ const CreateStep4 = (() => {
     
     console.log('Opening modal with draft data:', itineraryForModal);
     
-    // Try multiple methods to open the modal
+    // The TripModal.open expects a data object with itinerary and context
+    const modalData = {
+      itinerary: itineraryForModal,
+      context: 'preview'
+    };
+    
+    // Call TripModal.open directly with the correct data structure
     if (typeof TripModal !== 'undefined' && TripModal.open) {
-      // Direct method if TripModal has an open method
-      TripModal.open(itineraryForModal, 'preview');
-    } else if (typeof ItineraryModal !== 'undefined' && ItineraryModal.open) {
-      // Try ItineraryModal if available
-      ItineraryModal.open(itineraryForModal, 'preview');
+      console.log('Calling TripModal.open directly');
+      TripModal.open(modalData);
     } else {
-      // Use Events system
-      Events.emit('trip-modal:open', { 
-        itinerary: itineraryForModal, 
-        context: 'preview',
-        isDraft: true
-      });
-      
-      // Also try alternate event names
-      Events.emit('itinerary-modal:open', { 
-        itinerary: itineraryForModal, 
-        context: 'preview',
-        isDraft: true
-      });
+      console.error('TripModal not found, trying Events system');
+      // Fallback to Events system
+      Events.emit('trip-modal:open', modalData);
     }
   };
 
