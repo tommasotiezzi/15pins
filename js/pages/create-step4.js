@@ -1,6 +1,6 @@
 /**
  * Create Step 4 - Review & Publish
- * Fixed preview that uses draft data, improved UI
+ * Fixed preview with manual checklist
  */
 
 const CreateStep4 = (() => {
@@ -32,9 +32,6 @@ const CreateStep4 = (() => {
     // Get current user for creator info
     const currentUser = State.get('currentUser');
     
-    // Check completion status
-    const checks = getChecklistStatus(draft);
-    
     container.innerHTML = `
       <div class="review-container">
         <!-- Two Column Layout -->
@@ -58,41 +55,35 @@ const CreateStep4 = (() => {
           
           <!-- Right Column: Checklist & Actions -->
           <div class="checklist-column">
-            <!-- Quality Checklist -->
-            <div class="quality-checklist ${checks.isReady ? 'complete' : 'incomplete'}">
-              <div class="checklist-header">
-                <h3>${checks.isReady ? '✅' : '📋'} Quality Checklist</h3>
-                <span class="checklist-status">
-                  ${Object.values(checks).filter(v => v === true).length - 1}/5 Complete
-                </span>
-              </div>
+            <!-- Manual Quality Checklist -->
+            <div class="publish-checklist">
+              <h3>📋 Final Quality Check</h3>
+              <p>Please confirm you've completed these items:</p>
               
-              <div class="checklist-items">
-                ${renderChecklistItem('Each day has 3+ stops', checks.hasEnoughStops, 
-                  draft.days?.length ? `You have ${draft.days.map(d => d.stops?.length || 0).join(', ')} stops per day` : 'Add stops to each day')}
-                
-                ${renderChecklistItem('Personal tips included', checks.hasTips,
-                  checks.hasTips ? 'All stops have tips' : 'Add tips to each stop')}
-                
-                ${renderChecklistItem('Transportation explained', checks.hasTransport,
-                  checks.hasTransport ? 'Transport info added' : 'Add getting there/around info')}
-                
-                ${renderChecklistItem('Accommodation covered', checks.hasAccommodation,
-                  checks.hasAccommodation ? 'Areas recommended' : 'Add area recommendations')}
-                
-                ${renderChecklistItem('Characteristics defined', checks.hasCharacteristics,
-                  checks.hasCharacteristics ? 'All characteristics set' : 'Define trip characteristics')}
-              </div>
+              <label class="checkbox">
+                <input type="checkbox" id="check-stops">
+                <span>Each day has at least 3 meaningful stops</span>
+              </label>
               
-              ${!checks.isReady ? `
-                <div class="checklist-footer warning">
-                  <span>⚠️ Complete all items to publish</span>
-                </div>
-              ` : `
-                <div class="checklist-footer success">
-                  <span>🎉 Ready to publish!</span>
-                </div>
-              `}
+              <label class="checkbox">
+                <input type="checkbox" id="check-tips">
+                <span>Added personal tips & insider knowledge for each stop</span>
+              </label>
+              
+              <label class="checkbox">
+                <input type="checkbox" id="check-transport">
+                <span>Explained how to get there and get around</span>
+              </label>
+              
+              <label class="checkbox">
+                <input type="checkbox" id="check-accommodation">
+                <span>Recommended areas to stay for each location</span>
+              </label>
+              
+              <label class="checkbox">
+                <input type="checkbox" id="check-value">
+                <span>My itinerary is worth €${draft.price_tier} and provides real value</span>
+              </label>
             </div>
             
             <!-- Earnings Preview -->
@@ -148,10 +139,10 @@ const CreateStep4 = (() => {
                 </button>
                 
                 <button type="button" 
-                        class="btn btn-primary btn-publish ${checks.isReady ? 'ready' : 'disabled'}" 
+                        class="btn btn-primary btn-publish disabled" 
                         data-action="publish"
-                        ${!checks.isReady ? 'disabled' : ''}>
-                  ${checks.isReady ? '🚀 Publish Now' : '🔒 Complete Checklist'}
+                        disabled>
+                  🔒 Complete Checklist
                 </button>
               </div>
             </div>
@@ -278,7 +269,14 @@ const CreateStep4 = (() => {
 
   // ============= OPEN PREVIEW MODAL =============
   const openPreviewModal = (draft, currentUser) => {
+    if (!draft) {
+      draft = CreateController.getCurrentDraft();
+    }
     if (!draft) return;
+    
+    if (!currentUser) {
+      currentUser = State.get('currentUser');
+    }
     
     // Transform draft for modal
     const itineraryPreview = {
@@ -308,62 +306,15 @@ const CreateStep4 = (() => {
     });
   };
 
-  // ============= GET CHECKLIST STATUS =============
-  const getChecklistStatus = (draft) => {
-    // Check if each day has enough stops
-    const hasEnoughStops = draft.days?.length > 0 && 
-      draft.days.every(day => day.stops && day.stops.length >= 3);
-    
-    // Check if stops have tips/descriptions
-    const hasTips = draft.days?.length > 0 && 
-      draft.days.every(day => 
-        day.stops?.length > 0 && 
-        day.stops.every(stop => 
-          stop.tip?.trim() || stop.description?.trim()
-        )
-      );
-    
-    // Check transportation
-    const hasTransport = !!(
-      draft.transportation?.getting_there?.trim() || 
-      draft.transportation?.getting_around?.trim() ||
-      draft.transportation?.local_transport_tips?.trim()
-    );
-    
-    // Check accommodation
-    const hasAccommodation = !!(
-      draft.accommodation?.area_recommendations?.trim() ||
-      draft.accommodation?.booking_tips?.trim()
-    );
-    
-    // Check characteristics
-    const hasCharacteristics = !!(
-      draft.characteristics?.physical_demand &&
-      draft.characteristics?.pace &&
-      draft.characteristics?.budget_level &&
-      draft.characteristics?.cultural_immersion &&
-      draft.characteristics?.social_style
-    );
-    
-    const isReady = hasEnoughStops && hasTips && hasTransport && 
-                    hasAccommodation && hasCharacteristics;
-    
-    return {
-      hasEnoughStops,
-      hasTips,
-      hasTransport,
-      hasAccommodation,
-      hasCharacteristics,
-      isReady
-    };
-  };
-
   // ============= HANDLE PUBLISH =============
   const handlePublish = async () => {
     const draft = CreateController.getCurrentDraft();
-    const checks = getChecklistStatus(draft);
     
-    if (!checks.isReady) {
+    // Check if all checkboxes are checked
+    const checkboxes = document.querySelectorAll('.publish-checklist input[type="checkbox"]');
+    const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+    
+    if (!allChecked) {
       Toast.error('Please complete all checklist items');
       return;
     }
