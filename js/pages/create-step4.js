@@ -288,55 +288,93 @@ const CreateStep4 = (() => {
 
   // ============= SETUP CARD PREVIEW =============
   const setupCardPreview = (draft, currentUser) => {
-    // Setup click handler for both card types
-    const cards = document.querySelectorAll('[data-itinerary-id="preview"], .itinerary-card-fallback');
-    
-    cards.forEach(card => {
-      card.addEventListener('click', (e) => {
-        // Don't trigger on button clicks
-        if (e.target.tagName === 'BUTTON') return;
-        
-        e.preventDefault();
-        e.stopPropagation();
-        
-        // For preview context, pass the draft data directly
-        const itineraryForModal = {
-          id: 'preview',
-          title: draft.title,
-          destination: draft.destination,
-          duration_days: draft.duration_days,
-          description: draft.description,
-          price_tier: draft.price_tier,
-          cover_image_url: draft.cover_image_url,
-          days: draft.days || [],
-          characteristics: draft.characteristics,
-          transportation: draft.transportation,
-          accommodation: draft.accommodation,
-          travel_tips: draft.travel_tips,
-          total_sales: 0,
-          view_count: 0,
-          creator: {
-            username: currentUser?.username || currentUser?.profile?.username || 'You',
-            avatar_url: currentUser?.avatar_url || currentUser?.profile?.avatar_url,
-            bio: currentUser?.bio || currentUser?.profile?.bio
+    // Add a small delay to ensure DOM is ready
+    setTimeout(() => {
+      // Setup click handler for the card container
+      const cardWrapper = document.querySelector('.preview-card-wrapper');
+      if (cardWrapper) {
+        cardWrapper.addEventListener('click', (e) => {
+          // Don't trigger on certain button clicks
+          if (e.target.closest('[data-action="back-to-build"]')) return;
+          if (e.target.closest('[data-action="wishlist"]')) return;
+          
+          // Check if clicking on the card itself or Full Preview button
+          const isCard = e.target.closest('.itinerary-card, .itinerary-card-fallback');
+          const isPreviewBtn = e.target.closest('.btn-secondary') || e.target.textContent.includes('Full Preview');
+          
+          if (isCard || isPreviewBtn) {
+            e.preventDefault();
+            e.stopPropagation();
+            openPreviewModal(draft, currentUser);
           }
-        };
-        
-        // Emit event for TripModal with draft data
-        Events.emit('trip-modal:open', { 
-          itinerary: itineraryForModal, 
-          context: 'preview',
-          isDraft: true // Flag to indicate this is draft data
         });
-      });
-    });
+      }
+      
+      // Also add direct click handler to fallback card
+      const fallbackCard = document.querySelector('.itinerary-card-fallback');
+      if (fallbackCard) {
+        fallbackCard.style.cursor = 'pointer';
+        fallbackCard.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          openPreviewModal(draft, currentUser);
+        });
+      }
+    }, 100);
+  };
+
+  // ============= OPEN PREVIEW MODAL (SIMPLIFIED) =============
+  const openPreviewModal = (draft, currentUser) => {
+    if (!draft) {
+      console.error('No draft data for preview');
+      return;
+    }
     
-    // Handle "Continue Editing" button if ItineraryCard rendered it
-    const editBtn = document.querySelector('[data-action="back-to-build"]');
-    if (editBtn) {
-      editBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        Events.emit('action:back-to-build');
+    // Transform draft for modal
+    const itineraryForModal = {
+      id: 'preview',
+      title: draft.title || 'Untitled Itinerary',
+      destination: draft.destination || 'Unknown',
+      duration_days: draft.duration_days || 0,
+      description: draft.description || '',
+      price_tier: draft.price_tier || 9,
+      cover_image_url: draft.cover_image_url || '',
+      days: draft.days || [],
+      characteristics: draft.characteristics || {},
+      transportation: draft.transportation || null,
+      accommodation: draft.accommodation || null,
+      travel_tips: draft.travel_tips || null,
+      total_sales: 0,
+      view_count: 0,
+      creator: {
+        username: currentUser?.username || currentUser?.profile?.username || 'You',
+        avatar_url: currentUser?.avatar_url || currentUser?.profile?.avatar_url || 'https://i.pravatar.cc/32',
+        bio: currentUser?.bio || currentUser?.profile?.bio || ''
+      }
+    };
+    
+    console.log('Opening modal with draft data:', itineraryForModal);
+    
+    // Try multiple methods to open the modal
+    if (typeof TripModal !== 'undefined' && TripModal.open) {
+      // Direct method if TripModal has an open method
+      TripModal.open(itineraryForModal, 'preview');
+    } else if (typeof ItineraryModal !== 'undefined' && ItineraryModal.open) {
+      // Try ItineraryModal if available
+      ItineraryModal.open(itineraryForModal, 'preview');
+    } else {
+      // Use Events system
+      Events.emit('trip-modal:open', { 
+        itinerary: itineraryForModal, 
+        context: 'preview',
+        isDraft: true
+      });
+      
+      // Also try alternate event names
+      Events.emit('itinerary-modal:open', { 
+        itinerary: itineraryForModal, 
+        context: 'preview',
+        isDraft: true
       });
     }
   };
