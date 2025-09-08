@@ -1,6 +1,7 @@
 /**
  * Create Page Controller
  * Handles itinerary creation flow with Supabase backend
+ * Updated with Step 3: Trip Details
  */
 
 const CreatePage = (() => {
@@ -46,10 +47,16 @@ const CreatePage = (() => {
     // Form submission
     Events.on('form:setup', handleSetupSubmit);
     
-    // Navigation
+    // Navigation - UPDATED FOR 4 STEPS
     Events.on('action:back-to-setup', () => goToStep(1));
-    Events.on('action:go-to-review', () => goToStep(3));
+    Events.on('action:back-to-days', () => goToStep(2));
+    Events.on('action:go-to-review', () => goToStep(3)); // Now goes to Step 3
     Events.on('action:back-to-build', () => goToStep(2));
+    Events.on('action:continue-to-review', handleContinueToReview); // NEW: Step 3 -> 4
+    
+    // Step 3 specific events
+    Events.on('action:toggle-essential', toggleEssentialSection);
+    Events.on('action:save-step3', saveStep3);
     
     // Day management
     Events.on('action:add-day', addDay);
@@ -194,7 +201,12 @@ const CreatePage = (() => {
           lat: stop.lat,
           lng: stop.lng
         }))
-      }))
+      })),
+      // Store Step 3 data if it exists
+      characteristics: draft.draft_characteristics?.[0] || null,
+      transportation: draft.draft_transportation?.[0] || null,
+      accommodation: draft.draft_accommodation?.[0] || null,
+      travel_tips: draft.draft_travel_tips?.[0] || null
     };
     
     currentStep = draft.current_step || 2;
@@ -359,15 +371,15 @@ const CreatePage = (() => {
   };
 
   /**
-   * Render current step
+   * Render current step - UPDATED FOR 4 STEPS
    */
   const renderStep = (step) => {
     currentStep = step;
     
-    // Update progress bar
+    // Update progress bar for 4 steps
     const progressBar = document.getElementById('progress-bar');
     if (progressBar) {
-      progressBar.style.width = `${(step / 3) * 100}%`;
+      progressBar.style.width = `${(step / 4) * 100}%`;
     }
     
     // Update step indicators
@@ -391,12 +403,14 @@ const CreatePage = (() => {
     if (step === 2) {
       initializeDaysBuilder();
     } else if (step === 3) {
+      initializeTripDetails(); // NEW: Initialize Step 3
+    } else if (step === 4) {
       renderPreview();
     }
   };
 
   /**
-   * Go to specific step
+   * Go to specific step - UPDATED FOR 4 STEPS
    */
   const goToStep = (step) => {
     // Save current form values before changing steps
@@ -414,7 +428,328 @@ const CreatePage = (() => {
       return;
     }
     
+    if (step === 4 && !validateCharacteristics()) {
+      Toast.error('Please complete trip characteristics');
+      return;
+    }
+    
     renderStep(step);
+  };
+
+  /**
+   * NEW: Initialize Step 3 - Trip Details
+   */
+  const initializeTripDetails = async () => {
+    if (!currentDraftId) return;
+    
+    // Load existing characteristics
+    const { data: characteristics } = await API.drafts.getCharacteristics(currentDraftId);
+    if (characteristics) {
+      populateCharacteristics(characteristics);
+    }
+    
+    // Load existing essentials
+    const essentials = await API.drafts.getAllEssentials(currentDraftId);
+    if (essentials.transportation) {
+      populateTransportation(essentials.transportation);
+    }
+    if (essentials.accommodation) {
+      populateAccommodation(essentials.accommodation);
+    }
+    if (essentials.travel_tips) {
+      populateTravelTips(essentials.travel_tips);
+    }
+    
+    updateCompletionChecklist();
+    
+    // Add change listeners to update checklist in real-time
+    document.querySelectorAll('input[type="radio"]').forEach(radio => {
+      radio.addEventListener('change', updateCompletionChecklist);
+    });
+    
+    document.querySelectorAll('.essentials-section textarea').forEach(textarea => {
+      textarea.addEventListener('input', () => {
+        updateEssentialIndicator(textarea.closest('.essentials-section').id);
+      });
+    });
+  };
+
+  /**
+   * NEW: Populate characteristics from saved data
+   */
+  const populateCharacteristics = (characteristics) => {
+    if (characteristics.physical_demand) {
+      const radio = document.querySelector(`input[name="physical_demand"][value="${characteristics.physical_demand}"]`);
+      if (radio) radio.checked = true;
+    }
+    if (characteristics.cultural_immersion) {
+      const radio = document.querySelector(`input[name="cultural_immersion"][value="${characteristics.cultural_immersion}"]`);
+      if (radio) radio.checked = true;
+    }
+    if (characteristics.pace) {
+      const radio = document.querySelector(`input[name="pace"][value="${characteristics.pace}"]`);
+      if (radio) radio.checked = true;
+    }
+    if (characteristics.budget_level) {
+      const radio = document.querySelector(`input[name="budget_level"][value="${characteristics.budget_level}"]`);
+      if (radio) radio.checked = true;
+    }
+    if (characteristics.social_style) {
+      const radio = document.querySelector(`input[name="social_style"][value="${characteristics.social_style}"]`);
+      if (radio) radio.checked = true;
+    }
+  };
+
+  /**
+   * NEW: Populate transportation section
+   */
+  const populateTransportation = (data) => {
+    if (data.getting_there) {
+      document.getElementById('getting_there').value = data.getting_there;
+    }
+    if (data.getting_around) {
+      document.getElementById('getting_around').value = data.getting_around;
+    }
+    if (data.local_transport_tips) {
+      document.getElementById('local_transport_tips').value = data.local_transport_tips;
+    }
+    updateEssentialIndicator('transportation-section');
+  };
+
+  /**
+   * NEW: Populate accommodation section
+   */
+  const populateAccommodation = (data) => {
+    if (data.area_recommendations) {
+      document.getElementById('area_recommendations').value = data.area_recommendations;
+    }
+    if (data.booking_tips) {
+      document.getElementById('booking_tips').value = data.booking_tips;
+    }
+    updateEssentialIndicator('accommodation-section');
+  };
+
+  /**
+   * NEW: Populate travel tips section
+   */
+  const populateTravelTips = (data) => {
+    if (data.best_time_to_visit) {
+      document.getElementById('best_time_to_visit').value = data.best_time_to_visit;
+    }
+    if (data.visa_requirements) {
+      document.getElementById('visa_requirements').value = data.visa_requirements;
+    }
+    if (data.packing_suggestions) {
+      document.getElementById('packing_suggestions').value = data.packing_suggestions;
+    }
+    if (data.budget_breakdown) {
+      document.getElementById('budget_breakdown').value = data.budget_breakdown;
+    }
+    if (data.other_tips) {
+      document.getElementById('other_tips').value = data.other_tips;
+    }
+    updateEssentialIndicator('tips-section');
+  };
+
+  /**
+   * NEW: Toggle essential section open/closed
+   */
+  const toggleEssentialSection = ({ data }) => {
+    const section = document.getElementById(`${data.section}-section`);
+    const content = section.querySelector('.section-content');
+    const icon = section.querySelector('.toggle-icon');
+    
+    if (content.style.display === 'none') {
+      content.style.display = 'block';
+      icon.textContent = '▲';
+    } else {
+      content.style.display = 'none';
+      icon.textContent = '▼';
+    }
+  };
+
+  /**
+   * NEW: Update completion checklist
+   */
+  const updateCompletionChecklist = () => {
+    // Check characteristics
+    const hasAllCharacteristics = 
+      document.querySelector('input[name="physical_demand"]:checked') &&
+      document.querySelector('input[name="cultural_immersion"]:checked') &&
+      document.querySelector('input[name="pace"]:checked') &&
+      document.querySelector('input[name="budget_level"]:checked') &&
+      document.querySelector('input[name="social_style"]:checked');
+    
+    const charCheck = document.getElementById('characteristics-check');
+    if (charCheck) {
+      if (hasAllCharacteristics) {
+        charCheck.classList.add('completed');
+        charCheck.querySelector('.check-icon').textContent = '✓';
+      } else {
+        charCheck.classList.remove('completed');
+        charCheck.querySelector('.check-icon').textContent = '○';
+      }
+    }
+    
+    // Check essentials
+    updateEssentialIndicator('transportation-section');
+    updateEssentialIndicator('accommodation-section');
+    updateEssentialIndicator('tips-section');
+  };
+
+  /**
+   * NEW: Update indicator for an essential section
+   */
+  const updateEssentialIndicator = (sectionId) => {
+    const section = document.getElementById(sectionId);
+    if (!section) return;
+    
+    const textareas = section.querySelectorAll('textarea');
+    const hasContent = Array.from(textareas).some(t => t.value.trim().length > 0);
+    
+    let checkId, indicator;
+    if (sectionId === 'transportation-section') {
+      checkId = 'transport-check';
+      indicator = document.getElementById('transport-indicator');
+    } else if (sectionId === 'accommodation-section') {
+      checkId = 'accommodation-check';
+      indicator = document.getElementById('accommodation-indicator');
+    } else if (sectionId === 'tips-section') {
+      checkId = 'tips-check';
+      indicator = document.getElementById('tips-indicator');
+    }
+    
+    const checkItem = document.getElementById(checkId);
+    if (checkItem) {
+      if (hasContent) {
+        section.classList.add('has-content');
+        checkItem.classList.add('completed');
+        checkItem.querySelector('.check-icon').textContent = '✓';
+        if (indicator) indicator.textContent = '✓ Added';
+      } else {
+        section.classList.remove('has-content');
+        checkItem.classList.remove('completed');
+        checkItem.querySelector('.check-icon').textContent = '○';
+        if (indicator) indicator.textContent = '';
+      }
+    }
+  };
+
+  /**
+   * NEW: Validate characteristics are complete
+   */
+  const validateCharacteristics = () => {
+    return !!(
+      document.querySelector('input[name="physical_demand"]:checked') &&
+      document.querySelector('input[name="cultural_immersion"]:checked') &&
+      document.querySelector('input[name="pace"]:checked') &&
+      document.querySelector('input[name="budget_level"]:checked') &&
+      document.querySelector('input[name="social_style"]:checked')
+    );
+  };
+
+  /**
+   * NEW: Save Step 3 data
+   */
+  const saveStep3 = async () => {
+    if (!currentDraftId) {
+      Toast.error('No draft to save');
+      return;
+    }
+    
+    const button = document.querySelector('[data-action="save-step3"]');
+    const originalText = button ? button.textContent : 'Save Trip Details';
+    if (button) {
+      button.disabled = true;
+      button.textContent = 'Saving...';
+    }
+    
+    try {
+      // Save characteristics if filled
+      if (validateCharacteristics()) {
+        const characteristics = {
+          physical_demand: parseInt(document.querySelector('input[name="physical_demand"]:checked').value),
+          cultural_immersion: parseInt(document.querySelector('input[name="cultural_immersion"]:checked').value),
+          pace: parseInt(document.querySelector('input[name="pace"]:checked').value),
+          budget_level: parseInt(document.querySelector('input[name="budget_level"]:checked').value),
+          social_style: parseInt(document.querySelector('input[name="social_style"]:checked').value)
+        };
+        
+        await API.drafts.saveCharacteristics(currentDraftId, characteristics);
+      }
+      
+      // Save transportation if has content
+      const transportData = {
+        getting_there: document.getElementById('getting_there').value,
+        getting_around: document.getElementById('getting_around').value,
+        local_transport_tips: document.getElementById('local_transport_tips').value
+      };
+      
+      if (Object.values(transportData).some(v => v.trim())) {
+        await API.drafts.saveTransportation(currentDraftId, transportData);
+      }
+      
+      // Save accommodation if has content
+      const accommodationData = {
+        area_recommendations: document.getElementById('area_recommendations').value,
+        booking_tips: document.getElementById('booking_tips').value
+      };
+      
+      if (Object.values(accommodationData).some(v => v.trim())) {
+        await API.drafts.saveAccommodation(currentDraftId, accommodationData);
+      }
+      
+      // Save travel tips if has content
+      const tipsData = {
+        best_time_to_visit: document.getElementById('best_time_to_visit').value,
+        visa_requirements: document.getElementById('visa_requirements').value,
+        packing_suggestions: document.getElementById('packing_suggestions').value,
+        budget_breakdown: document.getElementById('budget_breakdown').value,
+        other_tips: document.getElementById('other_tips').value
+      };
+      
+      if (Object.values(tipsData).some(v => v.trim())) {
+        await API.drafts.saveTravelTips(currentDraftId, tipsData);
+      }
+      
+      // Update current step in draft
+      await API.drafts.update(currentDraftId, { current_step: 3 });
+      
+      hasUnsavedChanges = false;
+      Toast.success('Trip details saved');
+      updateCompletionChecklist();
+      
+    } catch (error) {
+      console.error('Error saving step 3:', error);
+      Toast.error('Failed to save trip details');
+    } finally {
+      if (button) {
+        button.disabled = false;
+        button.textContent = originalText;
+      }
+    }
+  };
+
+  /**
+   * NEW: Handle continue from Step 3 to Step 4
+   */
+  const handleContinueToReview = async () => {
+    if (!validateCharacteristics()) {
+      Toast.error('Please complete all trip characteristics (required)');
+      
+      // Scroll to characteristics section
+      const charSection = document.querySelector('.characteristics-section');
+      if (charSection) {
+        charSection.scrollIntoView({ behavior: 'smooth' });
+      }
+      return;
+    }
+    
+    // Save before continuing
+    await saveStep3();
+    
+    // Move to step 4 (review)
+    goToStep(4);
   };
 
   /**
@@ -1000,7 +1335,7 @@ const CreatePage = (() => {
   };
 
   /**
-   * Render preview
+   * Render preview - UPDATED FOR STEP 4
    */
   const renderPreview = () => {
     // Save current form values before rendering preview
@@ -1116,7 +1451,7 @@ const CreatePage = (() => {
     if (!bar) return;
     
     if (currentDraft && currentDraftId) {
-      // Only show the bar if we're in step 2 or 3 (not during initial setup)
+      // Only show the bar if we're in step 2, 3, or 4 (not during initial setup)
       if (currentStep > 1) {
         bar.style.display = 'flex';
         

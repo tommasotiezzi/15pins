@@ -197,19 +197,24 @@
                     <p>Share your travel experience and earn from every sale</p>
                 </div>
 
+                <!-- Update the create-steps div -->
                 <div class="create-steps">
-                    <div class="step active" data-step="1">
-                        <span class="step-number">1</span>
-                        <span class="step-name">Choose Type</span>
-                    </div>
-                    <div class="step" data-step="2">
-                        <span class="step-number">2</span>
-                        <span class="step-name">Build Days</span>
-                    </div>
-                    <div class="step" data-step="3">
-                        <span class="step-number">3</span>
-                        <span class="step-name">Review & Publish</span>
-                    </div>
+                <div class="step active" data-step="1">
+                    <span class="step-number">1</span>
+                    <span class="step-name">Basic Info</span>
+                </div>
+                <div class="step" data-step="2">
+                    <span class="step-number">2</span>
+                    <span class="step-name">Build Days</span>
+                </div>
+                <div class="step" data-step="3">
+                    <span class="step-number">3</span>
+                    <span class="step-name">Trip Details</span>
+                </div>
+                <div class="step" data-step="4">
+                    <span class="step-number">4</span>
+                    <span class="step-name">Review</span>
+                </div>
                 </div>
 
                 <!-- Step 1: Choose Type & Basic Info -->
@@ -358,8 +363,393 @@
                     </div>
                 </div>
 
+                <!-- Add this new Step 3 content after the step-2 div -->
+<div class="create-step-content" id="step-3">
+  <div class="create-form">
+    <!-- Completion Checklist -->
+    <div class="completion-checklist">
+      <h3>Complete Your Itinerary</h3>
+      <div class="checklist-grid">
+        <div class="checklist-item completed">
+          <span class="check-icon">✓</span>
+          <span>Basic Information</span>
+        </div>
+        <div class="checklist-item completed">
+          <span class="check-icon">✓</span>
+          <span>Days & Stops</span>
+        </div>
+        <div class="checklist-item" id="characteristics-check">
+          <span class="check-icon">○</span>
+          <span>Trip Characteristics <span class="required-badge">Required</span></span>
+        </div>
+        <div class="checklist-item optional" id="transport-check">
+          <span class="check-icon">○</span>
+          <span>Transportation <span class="optional-badge">Optional - Boost sales!</span></span>
+        </div>
+        <div class="checklist-item optional" id="accommodation-check">
+          <span class="check-icon">○</span>
+          <span>Accommodation <span class="optional-badge">Optional - Help travelers!</span></span>
+        </div>
+        <div class="checklist-item optional" id="tips-check">
+          <span class="check-icon">○</span>
+          <span>Travel Tips <span class="optional-badge">Optional - Share expertise!</span></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Trip Characteristics Section (Required) -->
+    <div class="characteristics-section">
+      <h2>Trip Characteristics <span class="required">*Required</span></h2>
+      <p class="section-description">Help travelers understand what to expect from your itinerary</p>
+      
+      <!-- Physical Demand -->
+      <div class="characteristic-group">
+        <label class="characteristic-label">Physical Demand</label>
+        <div class="characteristic-options">
+          <label class="radio-card">
+            <input type="radio" name="physical_demand" value="1">
+            <div class="radio-card-content">
+              <strong>Very Easy</strong>
+              <small>Minimal walking, accessible</small>
+            </div>
+          </label>
+          <label class="radio-card">
+            <input type="radio" name="physical_demand" value="2">
+            <div class="radio-card-content">
+              <strong>Easy</strong>
+              <small>Light walking, mostly flat</small>
+            </div>
+          </label>
+          <label class="radio-card">
+            <input type="radio" name="physical_demand" value="3">
+            <div class="radio-card-content">
+              <strong>Moderate</strong>
+              <small>Regular walking, some stairs</small>
+            </div>
+          </label>
+          <label class="radio-card">
+            <input type="radio" name="physical_demand" value="4">
+            <div class="radio-card-content">
+              <strong>Challenging</strong>
+              <small>Long walks, hills, active</small>
+            </div>
+          </label>
+          <label class="radio-card">
+            <input type="radio" name="physical_demand" value="5">
+            <div class="radio-card-content">
+              <strong>Very Challenging</strong>
+              <small>Hiking, trekking, very active</small>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <!-- Cultural Immersion -->
+      <div class="characteristic-group">
+        <label class="characteristic-label">Cultural Immersion</label>
+        <div class="characteristic-options">
+          <label class="radio-card">
+            <input type="radio" name="cultural_immersion" value="1">
+            <div class="radio-card-content">
+              <strong>Tourist Path</strong>
+              <small>Main attractions only</small>
+            </div>
+          </label>
+          <label class="radio-card">
+            <input type="radio" name="cultural_immersion" value="2">
+            <div class="radio-card-content">
+              <strong>Some Local</strong>
+              <small>Mix of tourist & local</small>
+            </div>
+          </label>
+          <label class="radio-card">
+            <input type="radio" name="cultural_immersion" value="3">
+            <div class="radio-card-content">
+              <strong>Balanced</strong>
+              <small>Equal tourist & local</small>
+            </div>
+          </label>
+          <label class="radio-card">
+            <input type="radio" name="cultural_immersion" value="4">
+            <div class="radio-card-content">
+              <strong>Mostly Local</strong>
+              <small>Off beaten path</small>
+            </div>
+          </label>
+          <label class="radio-card">
+            <input type="radio" name="cultural_immersion" value="5">
+            <div class="radio-card-content">
+              <strong>Full Immersion</strong>
+              <small>Local life experience</small>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <!-- Pace -->
+      <div class="characteristic-group">
+        <label class="characteristic-label">Trip Pace</label>
+        <div class="characteristic-options">
+          <label class="radio-card">
+            <input type="radio" name="pace" value="1">
+            <div class="radio-card-content">
+              <strong>Very Relaxed</strong>
+              <small>1-2 activities/day</small>
+            </div>
+          </label>
+          <label class="radio-card">
+            <input type="radio" name="pace" value="2">
+            <div class="radio-card-content">
+              <strong>Relaxed</strong>
+              <small>2-3 activities/day</small>
+            </div>
+          </label>
+          <label class="radio-card">
+            <input type="radio" name="pace" value="3">
+            <div class="radio-card-content">
+              <strong>Moderate</strong>
+              <small>3-4 activities/day</small>
+            </div>
+          </label>
+          <label class="radio-card">
+            <input type="radio" name="pace" value="4">
+            <div class="radio-card-content">
+              <strong>Fast</strong>
+              <small>4-5 activities/day</small>
+            </div>
+          </label>
+          <label class="radio-card">
+            <input type="radio" name="pace" value="5">
+            <div class="radio-card-content">
+              <strong>Packed</strong>
+              <small>5+ activities/day</small>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <!-- Budget Level -->
+      <div class="characteristic-group">
+        <label class="characteristic-label">Budget Level</label>
+        <div class="characteristic-options">
+          <label class="radio-card">
+            <input type="radio" name="budget_level" value="1">
+            <div class="radio-card-content">
+              <strong>Backpacker</strong>
+              <small>Hostels, street food</small>
+            </div>
+          </label>
+          <label class="radio-card">
+            <input type="radio" name="budget_level" value="2">
+            <div class="radio-card-content">
+              <strong>Budget</strong>
+              <small>Budget hotels, local eats</small>
+            </div>
+          </label>
+          <label class="radio-card">
+            <input type="radio" name="budget_level" value="3">
+            <div class="radio-card-content">
+              <strong>Mid-Range</strong>
+              <small>3-star, nice restaurants</small>
+            </div>
+          </label>
+          <label class="radio-card">
+            <input type="radio" name="budget_level" value="4">
+            <div class="radio-card-content">
+              <strong>Upscale</strong>
+              <small>4-star, fine dining</small>
+            </div>
+          </label>
+          <label class="radio-card">
+            <input type="radio" name="budget_level" value="5">
+            <div class="radio-card-content">
+              <strong>Luxury</strong>
+              <small>5-star, premium experiences</small>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <!-- Best For (Social Style) -->
+      <div class="characteristic-group">
+        <label class="characteristic-label">Best For</label>
+        <div class="characteristic-options">
+          <label class="radio-card">
+            <input type="radio" name="social_style" value="1">
+            <div class="radio-card-content">
+              <strong>Solo Travelers</strong>
+              <small>Independent exploration</small>
+            </div>
+          </label>
+          <label class="radio-card">
+            <input type="radio" name="social_style" value="2">
+            <div class="radio-card-content">
+              <strong>Couples</strong>
+              <small>Romantic & intimate</small>
+            </div>
+          </label>
+          <label class="radio-card">
+            <input type="radio" name="social_style" value="3">
+            <div class="radio-card-content">
+              <strong>Friends</strong>
+              <small>Fun group activities</small>
+            </div>
+          </label>
+          <label class="radio-card">
+            <input type="radio" name="social_style" value="4">
+            <div class="radio-card-content">
+              <strong>Families</strong>
+              <small>Kid-friendly options</small>
+            </div>
+          </label>
+          <label class="radio-card">
+            <input type="radio" name="social_style" value="5">
+            <div class="radio-card-content">
+              <strong>Groups</strong>
+              <small>Large group logistics</small>
+            </div>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <!-- Travel Essentials (Optional) -->
+    <div class="essentials-container">
+      <h2>Travel Essentials <span class="optional-badge">Optional</span></h2>
+      <p class="section-description">Add helpful information to make your itinerary more valuable</p>
+      
+      <!-- Transportation -->
+      <div class="essentials-section" id="transportation-section">
+        <div class="section-header" data-action="toggle-essential" data-section="transportation">
+          <div class="header-left">
+            <span class="section-icon">🚕</span>
+            <h3>Transportation</h3>
+            <span class="completion-indicator" id="transport-indicator"></span>
+          </div>
+          <span class="toggle-icon">▼</span>
+        </div>
+        <div class="section-content" style="display: none;">
+          <div class="form-group">
+            <label>Getting There</label>
+            <textarea class="form-control" 
+                      id="getting_there" 
+                      placeholder="Best airports, train stations, or routes to reach the destination"
+                      rows="3"></textarea>
+          </div>
+          <div class="form-group">
+            <label>Getting Around</label>
+            <textarea class="form-control" 
+                      id="getting_around" 
+                      placeholder="Local transport options: metro, buses, taxis, rental cars, etc."
+                      rows="3"></textarea>
+          </div>
+          <div class="form-group">
+            <label>Transport Tips</label>
+            <textarea class="form-control" 
+                      id="local_transport_tips" 
+                      placeholder="Money-saving tips, apps to download, cards to buy, etc."
+                      rows="3"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <!-- Accommodation -->
+      <div class="essentials-section" id="accommodation-section">
+        <div class="section-header" data-action="toggle-essential" data-section="accommodation">
+          <div class="header-left">
+            <span class="section-icon">🏨</span>
+            <h3>Accommodation</h3>
+            <span class="completion-indicator" id="accommodation-indicator"></span>
+          </div>
+          <span class="toggle-icon">▼</span>
+        </div>
+        <div class="section-content" style="display: none;">
+          <div class="form-group">
+            <label>Best Areas to Stay</label>
+            <textarea class="form-control" 
+                      id="area_recommendations" 
+                      placeholder="Recommend neighborhoods for different types of travelers"
+                      rows="3"></textarea>
+          </div>
+          <div class="form-group">
+            <label>Booking Tips</label>
+            <textarea class="form-control" 
+                      id="booking_tips" 
+                      placeholder="Best booking times, platforms to use, things to watch for"
+                      rows="3"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <!-- Travel Tips -->
+      <div class="essentials-section" id="tips-section">
+        <div class="section-header" data-action="toggle-essential" data-section="tips">
+          <div class="header-left">
+            <span class="section-icon">💡</span>
+            <h3>Travel Tips & Advice</h3>
+            <span class="completion-indicator" id="tips-indicator"></span>
+          </div>
+          <span class="toggle-icon">▼</span>
+        </div>
+        <div class="section-content" style="display: none;">
+          <div class="form-group">
+            <label>Best Time to Visit</label>
+            <textarea class="form-control" 
+                      id="best_time_to_visit" 
+                      placeholder="Weather patterns, peak seasons, festivals to catch or avoid"
+                      rows="3"></textarea>
+          </div>
+          <div class="form-group">
+            <label>Visa Requirements</label>
+            <textarea class="form-control" 
+                      id="visa_requirements" 
+                      placeholder="Visa info for major nationalities, processing times"
+                      rows="3"></textarea>
+          </div>
+          <div class="form-group">
+            <label>Packing Suggestions</label>
+            <textarea class="form-control" 
+                      id="packing_suggestions" 
+                      placeholder="Essential items, weather-appropriate clothing, things often forgotten"
+                      rows="3"></textarea>
+          </div>
+          <div class="form-group">
+            <label>Budget Breakdown</label>
+            <textarea class="form-control" 
+                      id="budget_breakdown" 
+                      placeholder="Daily costs, money-saving tips, where to splurge vs save"
+                      rows="3"></textarea>
+          </div>
+          <div class="form-group">
+            <label>Other Tips</label>
+            <textarea class="form-control" 
+                      id="other_tips" 
+                      placeholder="Cultural etiquette, safety advice, local customs, useful apps"
+                      rows="3"></textarea>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="form-actions">
+      <button type="button" class="btn btn-secondary" data-action="back-to-days">
+        ← Back to Days
+      </button>
+      <div>
+        <button type="button" class="btn btn-secondary" data-action="save-step3">
+          Save Trip Details
+        </button>
+        <button type="button" class="btn btn-primary" data-action="continue-to-review">
+          Continue to Review →
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
                 <!-- Step 3: Review & Publish (unchanged) -->
-                <div class="create-step-content" id="step-3">
+                <div class="create-step-content" id="step-4">
                     <div id="itinerary-preview" class="itinerary-preview">
                         <!-- Preview will be generated here -->
                     </div>
