@@ -1,5 +1,5 @@
 /**
- * Create Page Controller - Complete Version with Data Loss Fix
+ * Create Page Controller
  * Handles itinerary creation flow with Supabase backend
  */
 
@@ -21,11 +21,12 @@ const CreatePage = (() => {
     Events.on('page:create:activate', activate);
     Events.on('page:create:deactivate', deactivate);
     
+    // Creation events from drafts page
+    Events.on('create:new', startNewItinerary);
+    Events.on('create:continue', continueDraft);
+    
     // Draft management
-    Events.on('action:start-new-itinerary', startNewItinerary);
-    Events.on('action:continue-draft', continueDraft);
     Events.on('action:save-draft', saveDraft);
-    Events.on('action:delete-draft', deleteDraft);
     
     // Form submission
     Events.on('form:setup', handleSetupSubmit);
@@ -70,20 +71,8 @@ const CreatePage = (() => {
       return;
     }
 
-    // Load user's drafts
-    await loadUserDrafts();
-    
-    // Check if we should show draft selector or creation flow
-    const drafts = State.get('drafts.list') || [];
-    
-    if (drafts.length > 0 && !currentDraftId) {
-      showDraftSelector();
-    } else if (currentDraftId) {
-      showCreationFlow();
-    } else {
-      // No drafts, start new immediately
-      startNewItinerary();
-    }
+    // Show drafts page which will handle loading drafts
+    Events.emit('page:drafts:show');
   };
 
   /**
@@ -99,33 +88,6 @@ const CreatePage = (() => {
   };
 
   /**
-   * Load user's drafts
-   */
-  const loadUserDrafts = async () => {
-    const user = State.get('currentUser');
-    if (!user) return;
-
-    const { data: drafts, error } = await API.drafts.list(user.id);
-    
-    if (!error && drafts) {
-      State.set('drafts.list', drafts);
-    }
-  };
-
-  /**
-   * Show draft selector
-   */
-  const showDraftSelector = () => {
-    const selector = document.getElementById('draft-selector');
-    const flow = document.getElementById('creation-flow');
-    
-    if (selector) selector.style.display = 'block';
-    if (flow) flow.style.display = 'none';
-    
-    renderDraftsList();
-  };
-
-  /**
    * Show creation flow
    */
   const showCreationFlow = () => {
@@ -137,44 +99,7 @@ const CreatePage = (() => {
   };
 
   /**
-   * Render drafts list
-   */
-  const renderDraftsList = () => {
-    const container = document.getElementById('drafts-list');
-    if (!container) return;
-    
-    const drafts = State.get('drafts.list') || [];
-    
-    if (drafts.length === 0) {
-      container.innerHTML = `
-        <div class="empty-state">
-          <p>No drafts yet. Start creating your first itinerary!</p>
-        </div>
-      `;
-      return;
-    }
-    
-    container.innerHTML = drafts.map(draft => `
-      <div class="draft-card" data-draft-id="${draft.id}">
-        <div class="draft-info">
-          <h3>${draft.title || 'Untitled Itinerary'}</h3>
-          <p>${draft.destination || 'No destination'} • ${draft.duration_days || 0} days</p>
-          <p class="text-light">€${draft.price_tier} Guide • Last saved ${formatDate(draft.last_saved_at)}</p>
-        </div>
-        <div class="draft-actions">
-          <button class="btn btn-primary" data-action="continue-draft" data-draft-id="${draft.id}">
-            Continue Editing
-          </button>
-          <button class="btn btn-ghost" data-action="delete-draft" data-draft-id="${draft.id}">
-            Delete
-          </button>
-        </div>
-      </div>
-    `).join('');
-  };
-
-  /**
-   * Start new itinerary
+   * Start new itinerary (called from drafts page)
    */
   const startNewItinerary = () => {
     currentDraftId = null;
@@ -191,16 +116,15 @@ const CreatePage = (() => {
   };
 
   /**
-   * Continue existing draft
+   * Continue existing draft (called from drafts page)
    */
-  const continueDraft = async ({ data }) => {
-    const draftId = data.draftId;
-    
+  const continueDraft = async ({ draftId }) => {
     // Load draft from backend
     const { data: draft, error } = await API.drafts.get(draftId);
     
     if (error || !draft) {
       Toast.error('Failed to load draft');
+      Events.emit('page:drafts:show');
       return;
     }
     
@@ -213,40 +137,6 @@ const CreatePage = (() => {
     renderStep(currentStep);
     populateDraftData();
     updateDraftInfoBar();
-  };
-
-  /**
-   * Delete draft
-   */
-  const deleteDraft = async ({ data }) => {
-    if (!confirm('Are you sure you want to delete this draft?')) {
-      return;
-    }
-    
-    const { error } = await API.drafts.delete(data.draftId);
-    
-    if (!error) {
-      Toast.success('Draft deleted');
-      
-      // Reload drafts list
-      await loadUserDrafts();
-      
-      // If we deleted the current draft, reset
-      if (data.draftId === currentDraftId) {
-        currentDraftId = null;
-        currentDraft = null;
-      }
-      
-      // Show selector or start new
-      const drafts = State.get('drafts.list') || [];
-      if (drafts.length > 0) {
-        showDraftSelector();
-      } else {
-        startNewItinerary();
-      }
-    } else {
-      Toast.error('Failed to delete draft');
-    }
   };
 
   /**
@@ -1165,6 +1055,8 @@ const CreatePage = (() => {
    * Format date helper
    */
   const formatDate = (dateString) => {
+    if (!dateString) return 'never';
+    
     const date = new Date(dateString);
     const now = new Date();
     const diff = now - date;

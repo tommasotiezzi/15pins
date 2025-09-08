@@ -147,13 +147,22 @@
             <!-- Draft Selection/Creation -->
             <div id="draft-selector" class="draft-selector" style="display: none;">
                 <div class="container">
-                    <h2>Your Drafts</h2>
-                    <div id="drafts-list">
+                    <div class="drafts-header">
+                        <div>
+                            <h1>Your Drafts</h1>
+                            <p>Continue working on your itineraries or start a new one</p>
+                        </div>
+                        <button class="btn btn-primary btn-lg" data-action="start-new-itinerary">
+                            <svg width="20" height="20" fill="none">
+                                <path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                            </svg>
+                            Start New Itinerary
+                        </button>
+                    </div>
+                    
+                    <div id="drafts-list" class="drafts-grid">
                         <!-- Drafts will be listed here -->
                     </div>
-                    <button class="btn btn-primary" data-action="start-new-itinerary">
-                        + Start New Itinerary
-                    </button>
                 </div>
             </div>
 
@@ -445,6 +454,7 @@
     
     <!-- Pages -->
     <script src="/js/pages/feed.js"></script>
+    <script src="/js/pages/drafts.js"></script>  <!-- Add this line -->
     <script src="/js/pages/create.js"></script>
     
     <!-- Main app -->
