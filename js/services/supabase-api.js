@@ -7,8 +7,8 @@
  */
 
 // Initialize Supabase client
-const SUPABASE_URL = 'https://lpdzksrvsibtyurpazzs.supabase.co'; // Replace with your project URL
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxwZHprc3J2c2lidHl1cnBhenpzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTcyODI4MjEsImV4cCI6MjA3Mjg1ODgyMX0.A9quiC44ymRWK0rBX5StZrHvVqFlh1mCaRonaP1PC98'; // Replace with your anon key
+const SUPABASE_URL = 'https://lpdzksrvsibtyurpazzs.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxwZHprc3J2c2lidHl1cnBhenpzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTcyODI4MjEsImV4cCI6MjA3Mjg1ODgyMX0.A9quiC44ymRWK0rBX5StZrHvVqFlh1mCaRonaP1PC98';
 
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
@@ -180,6 +180,54 @@ const API = {
       return { data, error };
     },
 
+    async getPreview(draftId) {
+      const { data, error } = await supabase
+        .from('drafts')
+        .select(`
+          *,
+          draft_days (
+            *,
+            draft_stops (*)
+          ),
+          draft_characteristics (*),
+          draft_transportation (*),
+          draft_accommodation (*),
+          draft_travel_tips (*)
+        `)
+        .eq('id', draftId)
+        .single();
+      
+      if (data) {
+        // Sort days and stops
+        if (data.draft_days) {
+          data.draft_days.sort((a, b) => a.day_number - b.day_number);
+          data.draft_days.forEach(day => {
+            if (day.draft_stops) {
+              day.draft_stops.sort((a, b) => a.position - b.position);
+            }
+          });
+        }
+        
+        // Transform to preview format
+        return {
+          data: {
+            ...data,
+            days: data.draft_days?.map(day => ({
+              ...day,
+              stops: day.draft_stops || []
+            })) || [],
+            characteristics: data.draft_characteristics?.[0] || null,
+            transportation: data.draft_transportation?.[0] || null,
+            accommodation: data.draft_accommodation?.[0] || null,
+            travel_tips: data.draft_travel_tips?.[0] || null
+          },
+          error: null
+        };
+      }
+      
+      return { data: null, error };
+    },
+
     async list(userId) {
       const { data, error } = await supabase
         .from('drafts')
@@ -349,7 +397,7 @@ const API = {
       return { data: { itinerary_id: data } };
     },
 
-    // NEW STEP 3 METHODS - PROPERLY INSIDE THE DRAFTS OBJECT
+    // STEP 3 METHODS
     async getCharacteristics(draftId) {
       const { data, error } = await supabase
         .from('draft_characteristics')
