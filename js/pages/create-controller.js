@@ -14,7 +14,6 @@ const CreateController = (() => {
   // Loading & error handling
   let isTransitioning = false;
   let saveTimeout = null;
-  let lastSaveAttempt = null;
   const SAVE_TIMEOUT_MS = 30000; // 30 seconds
 
   // ============= INITIALIZATION =============
@@ -28,36 +27,42 @@ const CreateController = (() => {
     // Creation flow
     Events.on('create:new', startNewItinerary);
     Events.on('create:continue', continueDraft);
+    Events.on('action:start-new-itinerary', startNewItinerary);
     
-    // Navigation events
+    // Forward navigation
+    Events.on('action:continue-setup', () => handleStepTransition(1, 2));
+    Events.on('action:go-to-review', () => handleStepTransition(2, 3));
+    Events.on('action:continue-to-review', () => handleStepTransition(3, 4));
+    
+    // Back navigation
     Events.on('action:back-to-setup', () => handleStepTransition(currentStep, 1));
     Events.on('action:back-to-days', () => handleStepTransition(currentStep, 2));
     Events.on('action:back-to-build', () => handleStepTransition(currentStep, 2));
-    Events.on('action:go-to-details', () => handleStepTransition(2, 3));
-    Events.on('action:continue-to-review', () => handleStepTransition(3, 4));
+    Events.on('action:back-to-edit', () => handleStepTransition(currentStep, 2));
     
     // Save events
-    Events.on('action:manual-save', handleManualSave);
+    Events.on('action:save-draft', handleManualSave);
+    Events.on('action:save-step3', handleManualSave);
     Events.on('action:view-drafts', handleViewDrafts);
     
-    // Navigation button handlers
-    document.getElementById('next-button')?.addEventListener('click', handleNextButton);
-    document.getElementById('back-button')?.addEventListener('click', handleBackButton);
-    document.getElementById('save-button')?.addEventListener('click', handleManualSave);
+    // Publishing
+    Events.on('action:publish', handlePublish);
     
     // Initialize step modules
-    CreateStep1.init();
-    CreateStep2.init();
-    CreateStep3.init();
-    CreateStep4.init();
+    if (typeof CreateStep1 !== 'undefined') CreateStep1.init();
+    if (typeof CreateStep2 !== 'undefined') CreateStep2.init();
+    if (typeof CreateStep3 !== 'undefined') CreateStep3.init();
+    if (typeof CreateStep4 !== 'undefined') CreateStep4.init();
     
     // Setup router guard
-    Router.addGuard((to, from) => {
-      if (from?.name === 'create' && hasUnsavedChanges) {
-        return confirm('You have unsaved changes. Leave anyway?');
-      }
-      return true;
-    });
+    if (typeof Router !== 'undefined') {
+      Router.addGuard((to, from) => {
+        if (from?.name === 'create' && hasUnsavedChanges) {
+          return confirm('You have unsaved changes. Leave anyway?');
+        }
+        return true;
+      });
+    }
     
     // Track changes globally
     document.addEventListener('input', (e) => {
@@ -67,87 +72,10 @@ const CreateController = (() => {
     });
   };
 
-  // ============= NAVIGATION BUTTON HANDLERS =============
-  const handleNextButton = async () => {
-    const nextStep = currentStep + 1;
-    if (nextStep > 4) return;
-    
-    // Special handling for Step 4 (Publish)
-    if (currentStep === 4) {
-      await handlePublish();
-      return;
-    }
-    
-    // Validate current step before proceeding
-    if (!await validateCurrentStep()) {
-      return;
-    }
-    
-    await handleStepTransition(currentStep, nextStep);
-  };
-
-  const handleBackButton = async () => {
-    const prevStep = currentStep - 1;
-    if (prevStep < 1) return;
-    
-    await handleStepTransition(currentStep, prevStep);
-  };
-
-  const validateCurrentStep = async () => {
-    switch (currentStep) {
-      case 1:
-        return CreateStep1.validate ? await CreateStep1.validate() : true;
-      case 2:
-        return CreateStep2.validate ? await CreateStep2.validate() : true;
-      case 3:
-        return CreateStep3.validate ? await CreateStep3.validate() : true;
-      default:
-        return true;
-    }
-  };
-
-  const handlePublish = async () => {
-    if (!currentDraftId) {
-      Toast.error('No draft to publish');
-      return;
-    }
-    
-    const button = document.getElementById('next-button');
-    if (button) {
-      button.disabled = true;
-      button.textContent = 'Publishing...';
-    }
-    
-    try {
-      const { data, error } = await API.drafts.publish(currentDraftId);
-      
-      if (!error && data) {
-        Toast.success('🎉 Itinerary published successfully!');
-        
-        // Clear current draft
-        currentDraftId = null;
-        currentDraft = null;
-        hasUnsavedChanges = false;
-        
-        // Navigate to dashboard
-        setTimeout(() => {
-          Router.navigateTo('dashboard');
-        }, 2000);
-      } else {
-        throw new Error(error?.message || 'Failed to publish');
-      }
-    } catch (error) {
-      console.error('Publish error:', error);
-      Toast.error('Failed to publish itinerary');
-      if (button) {
-        button.disabled = false;
-        button.textContent = 'Publish Itinerary';
-      }
-    }
-  };
-
   // ============= PAGE LIFECYCLE =============
   const activate = async () => {
+    console.log('Create page activated');
+    
     const user = State.get('currentUser');
     if (!user) {
       Toast.error('Please sign in to create itineraries');
@@ -155,6 +83,7 @@ const CreateController = (() => {
       return;
     }
     
+    // Show drafts page by default
     Events.emit('page:drafts:show');
   };
 
@@ -168,9 +97,19 @@ const CreateController = (() => {
 
   // ============= CORE NAVIGATION HANDLER =============
   const handleStepTransition = async (fromStep, toStep) => {
-    if (isTransitioning) return;
+    console.log(`Transitioning from step ${fromStep} to step ${toStep}`);
     
-    // Check if going backward
+    if (isTransitioning) {
+      console.log('Already transitioning, ignoring');
+      return;
+    }
+    
+    // Validate step numbers
+    if (toStep < 1 || toStep > 4) {
+      console.error('Invalid step number:', toStep);
+      return;
+    }
+    
     const isGoingBack = toStep < fromStep;
     
     // Handle back navigation with unsaved changes
@@ -195,7 +134,7 @@ const CreateController = (() => {
     }
     
     // Forward navigation - save current step first
-    if (!isGoingBack) {
+    if (!isGoingBack && currentDraftId) {
       isTransitioning = true;
       showLoadingOverlay(`Saving Step ${fromStep}...`);
       
@@ -215,9 +154,6 @@ const CreateController = (() => {
         showLoadingOverlay(`Loading Step ${toStep}...`);
         await loadStepData(toStep);
         
-        // Render new step
-        renderStep(toStep);
-        
       } catch (error) {
         handleLoadError(error);
         isTransitioning = false;
@@ -227,21 +163,24 @@ const CreateController = (() => {
         isTransitioning = false;
       }
     }
+    
+    // Render the new step
+    renderStep(toStep);
   };
 
   // ============= SAVE WITH TIMEOUT =============
   const saveCurrentStepWithTimeout = () => {
     return new Promise((resolve) => {
-      lastSaveAttempt = { step: currentStep, timestamp: Date.now() };
-      
       // Set timeout
       saveTimeout = setTimeout(() => {
         hideLoadingOverlay();
-        Modal.alert({
-          title: 'Save Timeout',
-          message: 'Something went wrong. Please try again later.',
-          type: 'error'
-        });
+        if (typeof Modal !== 'undefined') {
+          Modal.alert({
+            title: 'Save Timeout',
+            message: 'Something went wrong. Please try again later.',
+            type: 'error'
+          });
+        }
         resolve(false);
       }, SAVE_TIMEOUT_MS);
       
@@ -255,42 +194,65 @@ const CreateController = (() => {
           clearTimeout(saveTimeout);
           console.error('Save error:', error);
           
-          Modal.confirm({
-            title: 'Save Failed',
-            message: 'Failed to save your changes. Retry?',
-            confirmText: 'Retry',
-            cancelText: 'Cancel',
-            onConfirm: () => {
-              saveCurrentStepWithTimeout().then(resolve);
-            },
-            onCancel: () => resolve(false)
-          });
+          if (typeof Modal !== 'undefined') {
+            Modal.confirm({
+              title: 'Save Failed',
+              message: 'Failed to save your changes. Retry?',
+              confirmText: 'Retry',
+              cancelText: 'Cancel',
+              onConfirm: () => {
+                saveCurrentStepWithTimeout().then(resolve);
+              },
+              onCancel: () => resolve(false)
+            });
+          } else {
+            resolve(false);
+          }
         });
     });
   };
 
   // ============= SAVE CURRENT STEP =============
   const saveCurrentStep = async () => {
-    if (!currentDraftId || !currentDraft) return;
+    if (!currentDraftId || !currentDraft) {
+      console.log('No draft to save');
+      return;
+    }
+    
+    console.log(`Saving step ${currentStep}`);
     
     switch (currentStep) {
       case 1:
-        return CreateStep1.saveStep();
+        if (typeof CreateStep1 !== 'undefined' && CreateStep1.saveStep) {
+          return CreateStep1.saveStep();
+        }
+        break;
       case 2:
-        return CreateStep2.saveStep();
+        if (typeof CreateStep2 !== 'undefined' && CreateStep2.saveStep) {
+          return CreateStep2.saveStep();
+        }
+        break;
       case 3:
-        return CreateStep3.saveStep();
+        if (typeof CreateStep3 !== 'undefined' && CreateStep3.saveStep) {
+          return CreateStep3.saveStep();
+        }
+        break;
       case 4:
         // Step 4 is review-only, nothing to save
         return Promise.resolve();
-      default:
-        return Promise.resolve();
     }
+    
+    return Promise.resolve();
   };
 
   // ============= LOAD STEP DATA =============
   const loadStepData = async (step) => {
-    if (!currentDraftId) return;
+    if (!currentDraftId) {
+      console.log('No draft ID, skipping data load');
+      return;
+    }
+    
+    console.log(`Loading data for step ${step}`);
     
     // For Step 4, fetch complete draft from DB
     if (step === 4) {
@@ -302,27 +264,25 @@ const CreateController = (() => {
       return;
     }
     
-    // For other steps, load specific data if needed
-    switch (step) {
-      case 3:
-        // Load characteristics and essentials
-        const [chars, essentials] = await Promise.all([
-          API.drafts.getCharacteristics(currentDraftId),
-          API.drafts.getAllEssentials(currentDraftId)
-        ]);
-        
-        if (chars.data) currentDraft.characteristics = chars.data;
-        if (essentials) {
-          currentDraft.transportation = essentials.transportation;
-          currentDraft.accommodation = essentials.accommodation;
-          currentDraft.travel_tips = essentials.travel_tips;
-        }
-        break;
+    // For Step 3, load characteristics and essentials
+    if (step === 3) {
+      const [chars, essentials] = await Promise.all([
+        API.drafts.getCharacteristics(currentDraftId),
+        API.drafts.getAllEssentials(currentDraftId)
+      ]);
+      
+      if (chars.data) currentDraft.characteristics = chars.data;
+      if (essentials) {
+        currentDraft.transportation = essentials.transportation;
+        currentDraft.accommodation = essentials.accommodation;
+        currentDraft.travel_tips = essentials.travel_tips;
+      }
     }
   };
 
   // ============= RENDER STEP =============
   const renderStep = (step) => {
+    console.log(`Rendering step ${step}`);
     currentStep = step;
     
     // Update progress bar
@@ -332,59 +292,95 @@ const CreateController = (() => {
     }
     
     // Update step indicators
-    document.querySelectorAll('.step').forEach((s, index) => {
+    document.querySelectorAll('.create-steps .step').forEach((s, index) => {
       const stepNum = index + 1;
       s.classList.toggle('active', stepNum === step);
       s.classList.toggle('completed', stepNum < step);
     });
     
-    // Update navigation buttons
-    const backBtn = document.getElementById('back-button');
-    const saveBtn = document.getElementById('save-button');
-    const nextBtn = document.getElementById('next-button');
-    
-    if (backBtn) backBtn.style.display = step > 1 ? 'inline-flex' : 'none';
-    if (saveBtn) saveBtn.style.display = step > 1 && step < 4 ? 'inline-flex' : 'none';
-    
-    if (nextBtn) {
-      if (step === 4) {
-        nextBtn.textContent = 'Publish Itinerary';
-        nextBtn.className = 'btn btn-primary btn-publish';
-      } else {
-        nextBtn.textContent = 'Continue →';
-        nextBtn.className = 'btn btn-primary';
-      }
-    }
-    
     // Hide all step content
     document.querySelectorAll('.create-step-content').forEach(content => {
       content.style.display = 'none';
+      content.classList.remove('active');
     });
     
     // Show current step
     const currentStepEl = document.getElementById(`step-${step}`);
     if (currentStepEl) {
       currentStepEl.style.display = 'block';
+      currentStepEl.classList.add('active');
     }
     
-    // Initialize step-specific content
+    // Call step-specific render method
     switch (step) {
       case 1:
-        CreateStep1.render();
+        if (typeof CreateStep1 !== 'undefined' && CreateStep1.render) {
+          CreateStep1.render();
+        }
         break;
       case 2:
-        CreateStep2.render();
+        if (typeof CreateStep2 !== 'undefined' && CreateStep2.render) {
+          CreateStep2.render();
+        }
         break;
       case 3:
-        CreateStep3.render();
+        if (typeof CreateStep3 !== 'undefined' && CreateStep3.render) {
+          CreateStep3.render();
+        }
         break;
       case 4:
-        CreateStep4.render();
+        if (typeof CreateStep4 !== 'undefined' && CreateStep4.render) {
+          CreateStep4.render();
+        }
         break;
     }
     
     hasUnsavedChanges = false;
     updateDraftInfoBar();
+  };
+
+  // ============= PUBLISHING =============
+  const handlePublish = async () => {
+    console.log('Publishing itinerary');
+    
+    if (!currentDraftId) {
+      Toast.error('No draft to publish');
+      return;
+    }
+    
+    const publishBtn = document.querySelector('[data-action="publish"]');
+    if (publishBtn) {
+      publishBtn.disabled = true;
+      publishBtn.textContent = 'Publishing...';
+    }
+    
+    try {
+      const { data, error } = await API.drafts.publish(currentDraftId);
+      
+      if (!error && data) {
+        Toast.success('🎉 Itinerary published successfully!');
+        
+        // Clear current draft
+        currentDraftId = null;
+        currentDraft = null;
+        hasUnsavedChanges = false;
+        
+        // Navigate to dashboard
+        setTimeout(() => {
+          Router.navigateTo('dashboard');
+        }, 2000);
+      } else {
+        throw new Error(error?.message || 'Failed to publish');
+      }
+    } catch (error) {
+      console.error('Publish error:', error);
+      Toast.error('Failed to publish itinerary');
+      
+      if (publishBtn) {
+        publishBtn.disabled = false;
+        publishBtn.textContent = 'Publish Itinerary';
+      }
+    }
   };
 
   // ============= UI HELPERS =============
@@ -416,15 +412,19 @@ const CreateController = (() => {
 
   const showDiscardModal = () => {
     return new Promise((resolve) => {
-      Modal.confirm({
-        title: 'Discard Changes?',
-        message: 'Going back will discard your recent changes. Are you sure?',
-        confirmText: 'Discard & Go Back',
-        cancelText: 'Stay Here',
-        danger: true,
-        onConfirm: () => resolve(true),
-        onCancel: () => resolve(false)
-      });
+      if (typeof Modal !== 'undefined') {
+        Modal.confirm({
+          title: 'Discard Changes?',
+          message: 'Going back will discard your recent changes. Are you sure?',
+          confirmText: 'Discard & Go Back',
+          cancelText: 'Stay Here',
+          danger: true,
+          onConfirm: () => resolve(true),
+          onCancel: () => resolve(false)
+        });
+      } else {
+        resolve(confirm('Discard unsaved changes?'));
+      }
     });
   };
 
@@ -433,27 +433,31 @@ const CreateController = (() => {
     console.error('Step transition error:', error);
     hideLoadingOverlay();
     
-    Modal.alert({
-      title: 'Error',
-      message: 'Failed to load the step. Please try again.',
-      type: 'error'
-    });
+    if (typeof Modal !== 'undefined') {
+      Modal.alert({
+        title: 'Error',
+        message: 'Failed to load the step. Please try again.',
+        type: 'error'
+      });
+    } else {
+      alert('Failed to load the step. Please try again.');
+    }
   };
 
   // ============= MANUAL SAVE =============
   const handleManualSave = async () => {
+    console.log('Manual save triggered');
+    
     if (!currentDraftId || !currentDraft) {
       Toast.error('No draft to save');
       return;
     }
     
-    const button = document.getElementById('save-button');
-    const originalText = button?.textContent || 'Save Draft';
-    
-    if (button) {
-      button.disabled = true;
-      button.textContent = 'Saving...';
-    }
+    const saveButtons = document.querySelectorAll('[data-action="save-draft"], [data-action="save-step3"]');
+    saveButtons.forEach(btn => {
+      btn.disabled = true;
+      btn.textContent = 'Saving...';
+    });
     
     try {
       await saveCurrentStep();
@@ -464,10 +468,10 @@ const CreateController = (() => {
       console.error('Save error:', error);
       Toast.error('Failed to save draft');
     } finally {
-      if (button) {
-        button.disabled = false;
-        button.textContent = originalText;
-      }
+      saveButtons.forEach(btn => {
+        btn.disabled = false;
+        btn.textContent = btn.textContent.includes('Trip') ? 'Save Trip Details' : 'Save Draft';
+      });
     }
   };
 
@@ -484,8 +488,10 @@ const CreateController = (() => {
 
   // ============= START NEW ITINERARY =============
   const startNewItinerary = () => {
+    console.log('Starting new itinerary');
+    
     currentDraftId = null;
-    currentDraft = null;
+    currentDraft = {};
     currentStep = 1;
     hasUnsavedChanges = false;
     selectedDayId = null;
@@ -497,6 +503,7 @@ const CreateController = (() => {
 
   // ============= CONTINUE DRAFT =============
   const continueDraft = async ({ draftId }) => {
+    console.log('Continuing draft:', draftId);
     showLoadingOverlay('Loading draft...');
     
     try {
@@ -534,14 +541,16 @@ const CreateController = (() => {
       
       // Transform draft_days to days
       days: (draft.draft_days || draft.days || []).map(day => ({
+        id: day.id,
         day_number: day.day_number,
         title: day.title || `Day ${day.day_number}`,
         description: day.description || '',
         stops: (day.draft_stops || day.stops || []).map(stop => ({
+          id: stop.id,
           name: stop.name || '',
           type: stop.type || 'attraction',
           position: stop.position,
-          tip: stop.tip || '',
+          tip: stop.tip || stop.note || '',
           time_period: stop.time_period || '',
           location: stop.location || '',
           start_time: stop.start_time || '',
