@@ -169,11 +169,22 @@
             <!-- Creation Flow -->
             <div id="creation-flow" class="create-container">
                 <!-- Current Draft Info Bar -->
+<!-- Current Draft Info Bar -->
                 <div id="draft-info-bar" class="draft-info-bar" style="display: none;">
-                    <span id="draft-title">Untitled Itinerary</span>
-                    <button class="btn btn-sm btn-secondary" data-action="save-draft">
-                        Save Draft
-                    </button>
+                    <div style="display: flex; align-items: center;">
+                        <span id="draft-title">Untitled Itinerary</span>
+                        <span class="draft-status saved" id="draft-status" style="display: none;">
+                            ✓ Saved
+                        </span>
+                    </div>
+                    <div style="display: flex; gap: var(--space-sm);">
+                        <button class="btn btn-sm btn-ghost" data-action="view-drafts">
+                            All Drafts
+                        </button>
+                        <button class="btn btn-sm btn-secondary" data-action="save-draft">
+                            Save Draft
+                        </button>
+                    </div>
                 </div>
 
                 <!-- Progress Bar -->

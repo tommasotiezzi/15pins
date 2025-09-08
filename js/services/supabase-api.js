@@ -203,16 +203,22 @@ const API = {
       return { data, error };
     },
 
-    async saveComplete(draftId, draftData) {
+async saveComplete(draftId, draftData) {
       // This saves the entire draft including days and stops
       // Used when clicking "Save Draft" button
       
       try {
+        console.log('API.drafts.saveComplete called with:', { draftId, draftData });
+        
         // Start a transaction-like operation
         const user = await API.auth.getUser();
-        if (!user) throw new Error('Not authenticated');
+        if (!user) {
+          console.error('No authenticated user');
+          throw new Error('Not authenticated');
+        }
 
         // 1. Update draft metadata
+        console.log('Updating draft metadata...');
         const { error: draftError } = await supabase
           .from('drafts')
           .update({
@@ -228,62 +234,91 @@ const API = {
           .eq('id', draftId)
           .eq('user_id', user.id);
 
-        if (draftError) throw draftError;
+        if (draftError) {
+          console.error('Error updating draft:', draftError);
+          throw draftError;
+        }
+        
+        console.log('Draft metadata updated successfully');
 
         // 2. Delete existing days and stops (easier than complex updates)
-        await supabase
+        console.log('Deleting existing days...');
+        const { error: deleteError } = await supabase
           .from('draft_days')
           .delete()
           .eq('draft_id', draftId);
+          
+        if (deleteError) {
+          console.error('Error deleting days:', deleteError);
+          // Continue anyway as there might be no days to delete
+        }
 
         // 3. Insert new days with their stops
         if (draftData.days && draftData.days.length > 0) {
+          console.log(`Inserting ${draftData.days.length} days...`);
+          
           for (const day of draftData.days) {
             // Insert day
+            console.log(`Inserting day ${day.day_number}...`);
             const { data: dayData, error: dayError } = await supabase
               .from('draft_days')
               .insert({
                 draft_id: draftId,
                 day_number: day.day_number,
-                title: day.title,
-                description: day.description
+                title: day.title || `Day ${day.day_number}`,
+                description: day.description || ''
               })
               .select()
               .single();
 
-            if (dayError) throw dayError;
+            if (dayError) {
+              console.error(`Error inserting day ${day.day_number}:`, dayError);
+              throw dayError;
+            }
+            
+            console.log(`Day ${day.day_number} inserted with ID:`, dayData.id);
 
             // Insert stops for this day
             const stops = day.stops || [];
             if (stops.length > 0) {
+              console.log(`Inserting ${stops.length} stops for day ${day.day_number}...`);
+              
               const stopsToInsert = stops.map((stop, index) => ({
                 draft_day_id: dayData.id,
                 position: index + 1,
-                name: stop.name,
-                type: stop.type,
-                tip: stop.tip,
-                time_period: stop.time_period,
-                location: stop.location,
-                start_time: stop.start_time,
-                duration_minutes: stop.duration_minutes,
-                cost_cents: stop.cost_cents,
-                description: stop.description,
-                link: stop.link,
-                lat: stop.lat,
-                lng: stop.lng
+                name: stop.name || '',
+                type: stop.type || 'attraction',
+                tip: stop.tip || '',
+                time_period: stop.time_period || null,
+                location: stop.location || null,
+                start_time: stop.start_time || null,
+                duration_minutes: stop.duration_minutes || null,
+                cost_cents: stop.cost_cents || null,
+                description: stop.description || null,
+                link: stop.link || null,
+                lat: stop.lat || null,
+                lng: stop.lng || null
               }));
 
               const { error: stopsError } = await supabase
                 .from('draft_stops')
                 .insert(stopsToInsert);
 
-              if (stopsError) throw stopsError;
+              if (stopsError) {
+                console.error(`Error inserting stops for day ${day.day_number}:`, stopsError);
+                throw stopsError;
+              }
+              
+              console.log(`${stops.length} stops inserted for day ${day.day_number}`);
             }
           }
         }
-
+        
+        console.log('Draft saved successfully!');
         return { data: { success: true }, error: null };
+        
       } catch (error) {
+        console.error('SaveComplete error:', error);
         return { data: null, error };
       }
     },

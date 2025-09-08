@@ -26,7 +26,16 @@ const CreatePage = (() => {
     Events.on('create:continue', continueDraft);
     
     // Draft management
-    Events.on('action:save-draft', saveDraft);
+    Events.on('action:save-draft', (eventData) => {
+      console.log('Save draft triggered with:', eventData);
+      saveDraft(eventData);
+    });
+    Events.on('action:view-drafts', () => {
+      if (hasUnsavedChanges && confirm('You have unsaved changes. Save before viewing drafts?')) {
+        saveDraft();
+      }
+      Events.emit('page:drafts:show');
+    });
     
     // Form submission
     Events.on('form:setup', handleSetupSubmit);
@@ -55,6 +64,23 @@ const CreatePage = (() => {
         return confirm('You have unsaved changes. Leave anyway?');
       }
       return true;
+    });
+    
+    // Listen for any input changes to track unsaved changes
+    document.addEventListener('input', (e) => {
+      if (e.target && currentDraftId) {
+        // Update title in real-time
+        if (e.target.id === 'title') {
+          currentDraft.title = e.target.value;
+        }
+        
+        // Mark as having unsaved changes
+        if (!hasUnsavedChanges) {
+          hasUnsavedChanges = true;
+        }
+        
+        updateDraftInfoBar();
+      }
     });
   };
 
@@ -134,6 +160,13 @@ const CreatePage = (() => {
     // Transform the Supabase structure (draft_days/draft_stops) to UI structure (days/stops)
     currentDraft = {
       ...draft,
+      // Preserve these important fields
+      title: draft.title || '',
+      destination: draft.destination || '',
+      duration_days: draft.duration_days || 0,
+      description: draft.description || '',
+      price_tier: draft.price_tier || 9,
+      cover_image_url: draft.cover_image_url || '',
       // Map draft_days to days for UI compatibility
       days: (draft.draft_days || []).map(day => ({
         day_number: day.day_number,
@@ -867,9 +900,14 @@ const CreatePage = (() => {
   };
 
   /**
-   * Save draft - Uses the transformed 'days' structure
+   * Save draft - FIXED with better error handling and event management
    */
-  const saveDraft = async () => {
+  const saveDraft = async (eventData) => {
+    // Prevent default if it's from a form
+    if (eventData && eventData.event && eventData.event.preventDefault) {
+      eventData.event.preventDefault();
+    }
+    
     if (!currentDraftId || !currentDraft) {
       Toast.error('No draft to save');
       return;
@@ -878,43 +916,70 @@ const CreatePage = (() => {
     // Save current form values before saving
     saveCurrentFormValues();
     
-    const button = event?.target || document.querySelector('[data-action="save-draft"]');
+    // If we're on step 1, also save the form values
+    if (currentStep === 1) {
+      const form = document.getElementById('setup-form');
+      if (form) {
+        currentDraft.title = form.title.value;
+        currentDraft.destination = form.destination.value;
+        currentDraft.duration_days = parseInt(form.duration.value) || currentDraft.duration_days;
+        currentDraft.description = form.description.value;
+      }
+    }
+    
+    // Get the button that was clicked
+    const button = eventData?.target || document.querySelector('[data-action="save-draft"]');
+    const originalText = button ? button.textContent : 'Save Draft';
+    
     if (button) {
       button.disabled = true;
       button.textContent = 'Saving...';
     }
     
-    // Prepare the data - use the transformed 'days' structure
-    const draftData = {
-      title: currentDraft.title,
-      destination: currentDraft.destination,
-      duration_days: currentDraft.duration_days,
-      description: currentDraft.description,
-      cover_image_url: currentDraft.cover_image_url,
-      current_step: currentStep,
-      price_tier: currentDraft.price_tier,
-      days: currentDraft.days  // This is already in the right format from our UI operations
-    };
-    
-    console.log('Saving draft data:', draftData);
-    
-    const { error } = await API.drafts.saveComplete(currentDraftId, draftData);
-    
-    if (!error) {
+    try {
+      // Prepare the data - use the transformed 'days' structure
+      const draftData = {
+        title: currentDraft.title || '',
+        destination: currentDraft.destination || '',
+        duration_days: currentDraft.duration_days || 0,
+        description: currentDraft.description || '',
+        cover_image_url: currentDraft.cover_image_url || '',
+        current_step: currentStep,
+        price_tier: currentDraft.price_tier || 9,
+        days: currentDraft.days || []  // This is already in the right format from our UI operations
+      };
+      
+      console.log('Saving draft data:', draftData);
+      console.log('Draft ID:', currentDraftId);
+      
+      const { error } = await API.drafts.saveComplete(currentDraftId, draftData);
+      
+      if (error) {
+        console.error('Save draft error:', error);
+        Toast.error('Failed to save draft: ' + (error.message || 'Unknown error'));
+        
+        if (button) {
+          button.disabled = false;
+          button.textContent = originalText;
+        }
+        return;
+      }
+      
       hasUnsavedChanges = false;
       Toast.success('Draft saved');
       
       // Update last saved time
       currentDraft.last_saved_at = new Date().toISOString();
       updateDraftInfoBar();
-    } else {
-      console.error('Save draft error:', error);
-      Toast.error('Failed to save draft: ' + (error.message || 'Unknown error'));
-    }
-    
-    if (button) {
-      button.disabled = false;
-      button.textContent = 'Save Draft';
+      
+    } catch (err) {
+      console.error('Unexpected error saving draft:', err);
+      Toast.error('Failed to save draft: ' + (err.message || 'Unknown error'));
+    } finally {
+      if (button) {
+        button.disabled = false;
+        button.textContent = originalText;
+      }
     }
   };
 
@@ -1040,13 +1105,49 @@ const CreatePage = (() => {
   const updateDraftInfoBar = () => {
     const bar = document.getElementById('draft-info-bar');
     const titleEl = document.getElementById('draft-title');
+    const statusEl = document.getElementById('draft-status');
     
     if (!bar) return;
     
-    if (currentDraft) {
-      bar.style.display = 'flex';
-      if (titleEl) {
-        titleEl.textContent = currentDraft.title || 'Untitled Itinerary';
+    if (currentDraft && currentDraftId) {
+      // Only show the bar if we're in step 2 or 3 (not during initial setup)
+      if (currentStep > 1) {
+        bar.style.display = 'flex';
+        
+        if (titleEl) {
+          // Update with current title from draft or form
+          const formTitle = document.getElementById('title');
+          let displayTitle = currentDraft.title || formTitle?.value || '';
+          
+          // Don't show test/debug titles or empty titles
+          if (!displayTitle || displayTitle.includes('test') || displayTitle.includes('te4st')) {
+            displayTitle = 'Untitled Itinerary';
+          }
+          
+          titleEl.textContent = displayTitle;
+        }
+        
+        // Update save status
+        if (statusEl) {
+          if (hasUnsavedChanges) {
+            statusEl.textContent = '• Unsaved changes';
+            statusEl.className = 'draft-status unsaved';
+            statusEl.style.display = 'inline-flex';
+          } else if (currentDraft.last_saved_at) {
+            statusEl.textContent = '✓ Saved';
+            statusEl.className = 'draft-status saved';
+            statusEl.style.display = 'inline-flex';
+            
+            // Hide the saved indicator after 2 seconds
+            setTimeout(() => {
+              if (statusEl && !hasUnsavedChanges) {
+                statusEl.style.display = 'none';
+              }
+            }, 2000);
+          }
+        }
+      } else {
+        bar.style.display = 'none';
       }
     } else {
       bar.style.display = 'none';
@@ -1063,16 +1164,37 @@ const CreatePage = (() => {
     if (currentStep === 1) {
       const form = document.getElementById('setup-form');
       if (form) {
-        form.title.value = currentDraft.title || '';
-        form.destination.value = currentDraft.destination || '';
-        form.duration.value = currentDraft.duration_days || '';
-        form.description.value = currentDraft.description || '';
+        if (form.title) form.title.value = currentDraft.title || '';
+        if (form.destination) form.destination.value = currentDraft.destination || '';
+        if (form.duration) form.duration.value = currentDraft.duration_days || '';
+        if (form.description) form.description.value = currentDraft.description || '';
         
         // Set price tier radio
         const priceRadio = form.querySelector(`input[name="product_type"][value="${currentDraft.price_tier}"]`);
         if (priceRadio) {
           priceRadio.checked = true;
-          priceRadio.disabled = true; // Lock it since it can't be changed
+          // Lock it if tier_locked is true
+          if (currentDraft.tier_locked) {
+            const allRadios = form.querySelectorAll('input[name="product_type"]');
+            allRadios.forEach(radio => radio.disabled = true);
+          }
+        }
+        
+        // Update character counts
+        const titleInput = form.title;
+        if (titleInput) {
+          const counter = titleInput.parentElement.querySelector('.char-count');
+          if (counter) {
+            counter.textContent = `${titleInput.value.length}/${titleInput.maxLength || 100}`;
+          }
+        }
+        
+        const descInput = form.description;
+        if (descInput) {
+          const counter = descInput.parentElement.querySelector('.char-count');
+          if (counter) {
+            counter.textContent = `${descInput.value.length}/${descInput.maxLength || 500}`;
+          }
         }
       }
     }
@@ -1104,6 +1226,7 @@ const CreatePage = (() => {
     
     currentDraft.days[dayIndex][field] = value;
     hasUnsavedChanges = true;
+    updateDraftInfoBar();
     
     if (field === 'title') {
       renderDaysList();
