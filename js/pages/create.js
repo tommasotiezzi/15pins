@@ -37,6 +37,12 @@ const CreatePage = (() => {
       Events.emit('page:drafts:show');
     });
     
+    // Setup continue button
+    Events.on('action:continue-setup', () => {
+      console.log('Continue setup action triggered');
+      handleSetupContinue();
+    });
+    
     // Form submission
     Events.on('form:setup', handleSetupSubmit);
     
