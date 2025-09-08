@@ -1164,10 +1164,32 @@ const CreatePage = (() => {
     if (currentStep === 1) {
       const form = document.getElementById('setup-form');
       if (form) {
-        if (form.title) form.title.value = currentDraft.title || '';
-        if (form.destination) form.destination.value = currentDraft.destination || '';
-        if (form.duration) form.duration.value = currentDraft.duration_days || '';
-        if (form.description) form.description.value = currentDraft.description || '';
+        if (form.title) {
+          form.title.value = currentDraft.title || '';
+          // Add input listener for title changes
+          form.title.addEventListener('input', (e) => {
+            currentDraft.title = e.target.value;
+            hasUnsavedChanges = true;
+          });
+        }
+        if (form.destination) {
+          form.destination.value = currentDraft.destination || '';
+          form.destination.addEventListener('input', () => {
+            hasUnsavedChanges = true;
+          });
+        }
+        if (form.duration) {
+          form.duration.value = currentDraft.duration_days || '';
+          form.duration.addEventListener('input', () => {
+            hasUnsavedChanges = true;
+          });
+        }
+        if (form.description) {
+          form.description.value = currentDraft.description || '';
+          form.description.addEventListener('input', () => {
+            hasUnsavedChanges = true;
+          });
+        }
         
         // Set price tier radio
         const priceRadio = form.querySelector(`input[name="product_type"][value="${currentDraft.price_tier}"]`);

@@ -205,7 +205,7 @@ const API = {
 
 async saveComplete(draftId, draftData) {
       // This saves the entire draft including days and stops
-      // Used when clicking "Save Draft" button
+      // OPTIMIZED: Uses batch inserts instead of individual calls
       
       try {
         console.log('API.drafts.saveComplete called with:', { draftId, draftData });
@@ -243,49 +243,45 @@ async saveComplete(draftId, draftData) {
 
         // 2. Delete existing days and stops (easier than complex updates)
         console.log('Deleting existing days...');
-        const { error: deleteError } = await supabase
+        await supabase
           .from('draft_days')
           .delete()
           .eq('draft_id', draftId);
-          
-        if (deleteError) {
-          console.error('Error deleting days:', deleteError);
-          // Continue anyway as there might be no days to delete
-        }
 
-        // 3. Insert new days with their stops
+        // 3. Batch insert all days at once
         if (draftData.days && draftData.days.length > 0) {
-          console.log(`Inserting ${draftData.days.length} days...`);
+          console.log(`Batch inserting ${draftData.days.length} days...`);
           
-          for (const day of draftData.days) {
-            // Insert day
-            console.log(`Inserting day ${day.day_number}...`);
-            const { data: dayData, error: dayError } = await supabase
-              .from('draft_days')
-              .insert({
-                draft_id: draftId,
-                day_number: day.day_number,
-                title: day.title || `Day ${day.day_number}`,
-                description: day.description || ''
-              })
-              .select()
-              .single();
+          // Prepare all days for batch insert
+          const daysToInsert = draftData.days.map(day => ({
+            draft_id: draftId,
+            day_number: day.day_number,
+            title: day.title || `Day ${day.day_number}`,
+            description: day.description || ''
+          }));
 
-            if (dayError) {
-              console.error(`Error inserting day ${day.day_number}:`, dayError);
-              throw dayError;
-            }
-            
-            console.log(`Day ${day.day_number} inserted with ID:`, dayData.id);
+          // Batch insert all days at once
+          const { data: insertedDays, error: daysError } = await supabase
+            .from('draft_days')
+            .insert(daysToInsert)
+            .select();
 
-            // Insert stops for this day
-            const stops = day.stops || [];
-            if (stops.length > 0) {
-              console.log(`Inserting ${stops.length} stops for day ${day.day_number}...`);
-              
-              const stopsToInsert = stops.map((stop, index) => ({
-                draft_day_id: dayData.id,
-                position: index + 1,
+          if (daysError) {
+            console.error('Error batch inserting days:', daysError);
+            throw daysError;
+          }
+
+          console.log(`${insertedDays.length} days inserted successfully`);
+
+          // 4. Prepare and batch insert all stops at once
+          const allStopsToInsert = [];
+          
+          draftData.days.forEach((day, dayIndex) => {
+            const insertedDay = insertedDays[dayIndex];
+            if (insertedDay && day.stops && day.stops.length > 0) {
+              const stopsForDay = day.stops.map((stop, stopIndex) => ({
+                draft_day_id: insertedDay.id,
+                position: stopIndex + 1,
                 name: stop.name || '',
                 type: stop.type || 'attraction',
                 tip: stop.tip || '',
@@ -299,18 +295,25 @@ async saveComplete(draftId, draftData) {
                 lat: stop.lat || null,
                 lng: stop.lng || null
               }));
-
-              const { error: stopsError } = await supabase
-                .from('draft_stops')
-                .insert(stopsToInsert);
-
-              if (stopsError) {
-                console.error(`Error inserting stops for day ${day.day_number}:`, stopsError);
-                throw stopsError;
-              }
               
-              console.log(`${stops.length} stops inserted for day ${day.day_number}`);
+              allStopsToInsert.push(...stopsForDay);
             }
+          });
+
+          // Batch insert all stops at once if there are any
+          if (allStopsToInsert.length > 0) {
+            console.log(`Batch inserting ${allStopsToInsert.length} stops...`);
+            
+            const { error: stopsError } = await supabase
+              .from('draft_stops')
+              .insert(allStopsToInsert);
+
+            if (stopsError) {
+              console.error('Error batch inserting stops:', stopsError);
+              throw stopsError;
+            }
+            
+            console.log(`${allStopsToInsert.length} stops inserted successfully`);
           }
         }
         
