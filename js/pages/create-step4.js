@@ -162,19 +162,41 @@ const CreateStep4 = (() => {
     
     // Initialize card click handler for preview
     setupCardPreview(draft, currentUser);
+    
+    // Initialize manual checkbox handlers
+    setupChecklistHandlers();
   };
 
-  // ============= RENDER CHECKLIST ITEM =============
-  const renderChecklistItem = (label, isComplete, helpText) => {
-    return `
-      <div class="checklist-item ${isComplete ? 'complete' : 'incomplete'}">
-        <div class="item-main">
-          <span class="item-check">${isComplete ? '✅' : '⭕'}</span>
-          <span class="item-label">${label}</span>
-        </div>
-        <span class="item-help">${helpText}</span>
-      </div>
-    `;
+  // ============= SETUP CHECKLIST HANDLERS =============
+  const setupChecklistHandlers = () => {
+    const checkboxes = document.querySelectorAll('.publish-checklist input[type="checkbox"]');
+    checkboxes.forEach(checkbox => {
+      checkbox.addEventListener('change', updatePublishButton);
+    });
+    
+    // Initial publish button state
+    updatePublishButton();
+  };
+
+  // ============= UPDATE PUBLISH BUTTON =============
+  const updatePublishButton = () => {
+    const publishBtn = document.querySelector('[data-action="publish"]');
+    if (!publishBtn) return;
+    
+    const checkboxes = document.querySelectorAll('.publish-checklist input[type="checkbox"]');
+    const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+    
+    publishBtn.disabled = !allChecked;
+    
+    if (allChecked) {
+      publishBtn.innerHTML = '🚀 Publish Now';
+      publishBtn.classList.remove('disabled');
+      publishBtn.classList.add('ready');
+    } else {
+      publishBtn.innerHTML = '🔒 Complete Checklist';
+      publishBtn.classList.add('disabled');
+      publishBtn.classList.remove('ready');
+    }
   };
 
   // ============= RENDER MARKETPLACE CARD =============
