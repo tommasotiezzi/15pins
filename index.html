@@ -142,112 +142,656 @@
             </section>
         </div>
 
-<!-- Create Page -->
-<div id="create-page" class="page">
-    <!-- Draft Selection/Creation -->
-    <div id="draft-selector" class="draft-selector" style="display: none;">
-        <div class="container">
-            <div class="drafts-header">
-                <div>
-                    <h1>Your Drafts</h1>
-                    <p>Continue working on your itineraries or start a new one</p>
+        <!-- Create Page -->
+        <div id="create-page" class="page">
+            <!-- Draft Selection/Creation -->
+            <div id="draft-selector" class="draft-selector" style="display: none;">
+                <div class="container">
+                    <div class="drafts-header">
+                        <div>
+                            <h1>Your Drafts</h1>
+                            <p>Continue working on your itineraries or start a new one</p>
+                        </div>
+                        <button class="btn btn-primary btn-lg" data-action="start-new-itinerary">
+                            <svg width="20" height="20" fill="none">
+                                <path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                            </svg>
+                            Start New Itinerary
+                        </button>
+                    </div>
+                    
+                    <div id="drafts-list" class="drafts-grid">
+                        <!-- Drafts will be listed here -->
+                    </div>
                 </div>
-                <button class="btn btn-primary btn-lg" data-action="start-new-itinerary">
-                    <svg width="20" height="20" fill="none">
-                        <path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                    </svg>
-                    Start New Itinerary
-                </button>
             </div>
-            
-            <div id="drafts-list" class="drafts-grid">
-                <!-- Drafts will be listed here -->
-            </div>
+
+            <!-- Creation Flow -->
+            <div id="creation-flow" class="create-container">
+                <!-- Current Draft Info Bar -->
+<!-- Current Draft Info Bar -->
+                <div id="draft-info-bar" class="draft-info-bar" style="display: none;">
+                    <div style="display: flex; align-items: center;">
+                        <span id="draft-title">Untitled Itinerary</span>
+                        <span class="draft-status saved" id="draft-status" style="display: none;">
+                            ✓ Saved
+                        </span>
+                    </div>
+                    <div style="display: flex; gap: var(--space-sm);">
+                        <button class="btn btn-sm btn-ghost" data-action="view-drafts">
+                            All Drafts
+                        </button>
+                        <button class="btn btn-sm btn-secondary" data-action="save-draft">
+                            Save Draft
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Progress Bar -->
+                <div class="progress-bar-container">
+                    <div id="progress-bar" class="progress-bar"></div>
+                </div>
+
+                <div class="create-header">
+                    <h1>Create Your Itinerary</h1>
+                    <p>Share your travel experience and earn from every sale</p>
+                </div>
+
+                <!-- Update the create-steps div -->
+                <div class="create-steps">
+                <div class="step active" data-step="1">
+                    <span class="step-number">1</span>
+                    <span class="step-name">Basic Info</span>
+                </div>
+                <div class="step" data-step="2">
+                    <span class="step-number">2</span>
+                    <span class="step-name">Build Days</span>
+                </div>
+                <div class="step" data-step="3">
+                    <span class="step-number">3</span>
+                    <span class="step-name">Trip Details</span>
+                </div>
+                <div class="step" data-step="4">
+                    <span class="step-number">4</span>
+                    <span class="step-name">Review</span>
+                </div>
+                </div>
+
+                <!-- Step 1: Choose Type & Basic Info -->
+                <div class="create-step-content active" id="step-1">
+                    <form class="create-form" id="setup-form">
+                        <!-- Product Type Selection (This comes FIRST now) -->
+                        <div class="form-group">
+                            <label>Choose Your Guide Type *</label>
+                            <div class="product-type-selector">
+                                <label class="product-option">
+                                    <input type="radio" name="product_type" value="9" checked>
+                                    <div class="product-card">
+                                        <div class="product-header">
+                                            <h4>Basic Guide</h4>
+                                            <span class="product-price">€9</span>
+                                        </div>
+                                        <p>Simple day-by-day itinerary with highlights</p>
+                                        <ul class="product-features">
+                                            <li class="included">✓ List of must-see places</li>
+                                            <li class="included">✓ Personal tips for each stop</li>
+                                            <li class="included">✓ General area recommendations</li>
+                                            <li class="excluded">✗ No detailed time schedules</li>
+                                            <li class="excluded">✗ No cost breakdowns</li>
+                                        </ul>
+                                        <div class="product-footer">
+                                            <small>~2 hours to create • You earn €7.65 per sale</small>
+                                        </div>
+                                    </div>
+                                </label>
+                                
+                                <label class="product-option">
+                                    <input type="radio" name="product_type" value="19">
+                                    <div class="product-card">
+                                        <div class="product-header">
+                                            <h4>Detailed Blueprint</h4>
+                                            <span class="product-price">€19</span>
+                                        </div>
+                                        <p>Hour-by-hour schedule with full logistics</p>
+                                        <ul class="product-features">
+                                            <li class="included">✓ Morning/Afternoon/Evening blocks</li>
+                                            <li class="included">✓ Exact times & durations</li>
+                                            <li class="included">✓ Cost breakdowns for each stop</li>
+                                            <li class="included">✓ Transportation details</li>
+                                            <li class="included">✓ Booking links & contacts</li>
+                                        </ul>
+                                        <div class="product-footer">
+                                            <small>~6 hours to create • You earn €16.15 per sale</small>
+                                        </div>
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Basic Info Fields -->
+                        <div class="form-group">
+                            <label for="title">Itinerary Title *</label>
+                            <input type="text" id="title" name="title" class="form-control" 
+                                   placeholder="e.g., 2 Weeks in Bali - Beaches, Rice Fields & Culture" 
+                                   maxlength="100" required>
+                            <span class="char-count">0/100</span>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="destination">Destination *</label>
+                                <input type="text" id="destination" name="destination" class="form-control"
+                                       placeholder="e.g., Bali, Indonesia" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="duration">Duration (days) *</label>
+                                <input type="number" id="duration" name="duration" class="form-control"
+                                       min="1" max="90" placeholder="14" required>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="description">Description *</label>
+                            <textarea id="description" name="description" class="form-control" rows="4" 
+                                      placeholder="Describe what makes your itinerary special. What will travelers experience?" 
+                                      maxlength="500" required></textarea>
+                            <span class="char-count">0/500</span>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="cover">Cover Image (optional)</label>
+                            <div class="file-upload">
+                                <input type="file" id="cover" name="cover" accept="image/*" class="file-input">
+                                <label for="cover" class="file-label">
+                                    <svg width="24" height="24" fill="none">
+                                        <path d="M12 4v12m-6-6h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                                    </svg>
+                                    <span>Choose image</span>
+                                </label>
+                            </div>
+                            <div id="cover-preview" class="image-preview hidden"></div>
+                        </div>
+
+                        <div class="form-actions">
+                            <button type="button" class="btn btn-primary" data-action="continue-setup">
+                                Continue to Build Days →
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Step 2: Build Days (unchanged) -->
+                <div class="create-step-content" id="step-2">
+                    <div class="price-tier-notice" id="tier-notice"></div>
+                    
+                    <div class="days-builder">
+                        <div class="days-sidebar">
+                            <div class="sidebar-header">
+                                <h3>Days</h3>
+                                <button class="btn btn-sm btn-primary" data-action="add-day">+ Add Day</button>
+                            </div>
+                            <div id="days-list" class="days-list">
+                                <!-- Days will be rendered here -->
+                            </div>
+                        </div>
+
+                        <div class="day-editor">
+                            <div id="day-editor-content">
+                                <div class="empty-state">
+                                    <svg width="48" height="48" fill="none" opacity="0.3">
+                                        <circle cx="24" cy="24" r="20" stroke="currentColor" stroke-width="2"/>
+                                        <path d="M24 14v10m0 4v2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                                    </svg>
+                                    <p>Select a day to start adding stops</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-secondary" data-action="back-to-setup">
+                            ← Back
+                        </button>
+                        <div>
+                            <button type="button" class="btn btn-secondary" data-action="save-draft">
+                                Save Draft
+                            </button>
+                            <button type="button" class="btn btn-primary" data-action="go-to-review">
+                                Review Itinerary →
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Add this new Step 3 content after the step-2 div -->
+<div class="create-step-content" id="step-3">
+  <div class="create-form">
+    <!-- Completion Checklist -->
+    <div class="completion-checklist">
+      <h3>Complete Your Itinerary</h3>
+      <div class="checklist-grid">
+        <div class="checklist-item completed">
+          <span class="check-icon">✓</span>
+          <span>Basic Information</span>
         </div>
+        <div class="checklist-item completed">
+          <span class="check-icon">✓</span>
+          <span>Days & Stops</span>
+        </div>
+        <div class="checklist-item" id="characteristics-check">
+          <span class="check-icon">○</span>
+          <span>Trip Characteristics <span class="required-badge">Required</span></span>
+        </div>
+        <div class="checklist-item optional" id="transport-check">
+          <span class="check-icon">○</span>
+          <span>Transportation <span class="optional-badge">Optional - Boost sales!</span></span>
+        </div>
+        <div class="checklist-item optional" id="accommodation-check">
+          <span class="check-icon">○</span>
+          <span>Accommodation <span class="optional-badge">Optional - Help travelers!</span></span>
+        </div>
+        <div class="checklist-item optional" id="tips-check">
+          <span class="check-icon">○</span>
+          <span>Travel Tips <span class="optional-badge">Optional - Share expertise!</span></span>
+        </div>
+      </div>
     </div>
 
-    <!-- Creation Flow -->
-    <div id="creation-flow" class="create-container" style="display: none;">
-        <!-- Current Draft Info Bar -->
-        <div id="draft-info-bar" class="draft-info-bar" style="display: none;">
-            <div style="display: flex; align-items: center;">
-                <span id="draft-title">Untitled Itinerary</span>
-                <span class="draft-status saved" id="draft-status" style="display: none;">
-                    ✓ Saved
-                </span>
+    <!-- Trip Characteristics Section (Required) -->
+    <div class="characteristics-section">
+      <h2>Trip Characteristics <span class="required">*Required</span></h2>
+      <p class="section-description">Help travelers understand what to expect from your itinerary</p>
+      
+      <!-- Physical Demand -->
+      <div class="characteristic-group">
+        <label class="characteristic-label">Physical Demand</label>
+        <div class="characteristic-options">
+          <label class="radio-card">
+            <input type="radio" name="physical_demand" value="1">
+            <div class="radio-card-content">
+              <strong>Very Easy</strong>
+              <small>Minimal walking, accessible</small>
             </div>
-            <div style="display: flex; gap: var(--space-sm);">
-                <button class="btn btn-sm btn-ghost" data-action="view-drafts">
-                    All Drafts
-                </button>
-                <button class="btn btn-sm btn-secondary" data-action="save-draft">
-                    Save Draft
-                </button>
+          </label>
+          <label class="radio-card">
+            <input type="radio" name="physical_demand" value="2">
+            <div class="radio-card-content">
+              <strong>Easy</strong>
+              <small>Light walking, mostly flat</small>
             </div>
+          </label>
+          <label class="radio-card">
+            <input type="radio" name="physical_demand" value="3">
+            <div class="radio-card-content">
+              <strong>Moderate</strong>
+              <small>Regular walking, some stairs</small>
+            </div>
+          </label>
+          <label class="radio-card">
+            <input type="radio" name="physical_demand" value="4">
+            <div class="radio-card-content">
+              <strong>Challenging</strong>
+              <small>Long walks, hills, active</small>
+            </div>
+          </label>
+          <label class="radio-card">
+            <input type="radio" name="physical_demand" value="5">
+            <div class="radio-card-content">
+              <strong>Very Challenging</strong>
+              <small>Hiking, trekking, very active</small>
+            </div>
+          </label>
         </div>
+      </div>
 
-        <!-- Progress Bar -->
-        <div class="progress-bar-container">
-            <div id="progress-bar" class="progress-bar"></div>
+      <!-- Cultural Immersion -->
+      <div class="characteristic-group">
+        <label class="characteristic-label">Cultural Immersion</label>
+        <div class="characteristic-options">
+          <label class="radio-card">
+            <input type="radio" name="cultural_immersion" value="1">
+            <div class="radio-card-content">
+              <strong>Tourist Path</strong>
+              <small>Main attractions only</small>
+            </div>
+          </label>
+          <label class="radio-card">
+            <input type="radio" name="cultural_immersion" value="2">
+            <div class="radio-card-content">
+              <strong>Some Local</strong>
+              <small>Mix of tourist & local</small>
+            </div>
+          </label>
+          <label class="radio-card">
+            <input type="radio" name="cultural_immersion" value="3">
+            <div class="radio-card-content">
+              <strong>Balanced</strong>
+              <small>Equal tourist & local</small>
+            </div>
+          </label>
+          <label class="radio-card">
+            <input type="radio" name="cultural_immersion" value="4">
+            <div class="radio-card-content">
+              <strong>Mostly Local</strong>
+              <small>Off beaten path</small>
+            </div>
+          </label>
+          <label class="radio-card">
+            <input type="radio" name="cultural_immersion" value="5">
+            <div class="radio-card-content">
+              <strong>Full Immersion</strong>
+              <small>Local life experience</small>
+            </div>
+          </label>
         </div>
+      </div>
 
-        <div class="create-header">
-            <h1>Create Your Itinerary</h1>
-            <p>Share your travel experience and earn from every sale</p>
+      <!-- Pace -->
+      <div class="characteristic-group">
+        <label class="characteristic-label">Trip Pace</label>
+        <div class="characteristic-options">
+          <label class="radio-card">
+            <input type="radio" name="pace" value="1">
+            <div class="radio-card-content">
+              <strong>Very Relaxed</strong>
+              <small>1-2 activities/day</small>
+            </div>
+          </label>
+          <label class="radio-card">
+            <input type="radio" name="pace" value="2">
+            <div class="radio-card-content">
+              <strong>Relaxed</strong>
+              <small>2-3 activities/day</small>
+            </div>
+          </label>
+          <label class="radio-card">
+            <input type="radio" name="pace" value="3">
+            <div class="radio-card-content">
+              <strong>Moderate</strong>
+              <small>3-4 activities/day</small>
+            </div>
+          </label>
+          <label class="radio-card">
+            <input type="radio" name="pace" value="4">
+            <div class="radio-card-content">
+              <strong>Fast</strong>
+              <small>4-5 activities/day</small>
+            </div>
+          </label>
+          <label class="radio-card">
+            <input type="radio" name="pace" value="5">
+            <div class="radio-card-content">
+              <strong>Packed</strong>
+              <small>5+ activities/day</small>
+            </div>
+          </label>
         </div>
+      </div>
 
-        <!-- Step Indicators -->
-        <div class="create-steps">
-            <div class="step active" data-step="1">
-                <span class="step-number">1</span>
-                <span class="step-name">Basic Info</span>
+      <!-- Budget Level -->
+      <div class="characteristic-group">
+        <label class="characteristic-label">Budget Level</label>
+        <div class="characteristic-options">
+          <label class="radio-card">
+            <input type="radio" name="budget_level" value="1">
+            <div class="radio-card-content">
+              <strong>Backpacker</strong>
+              <small>Hostels, street food</small>
             </div>
-            <div class="step" data-step="2">
-                <span class="step-number">2</span>
-                <span class="step-name">Build Days</span>
+          </label>
+          <label class="radio-card">
+            <input type="radio" name="budget_level" value="2">
+            <div class="radio-card-content">
+              <strong>Budget</strong>
+              <small>Budget hotels, local eats</small>
             </div>
-            <div class="step" data-step="3">
-                <span class="step-number">3</span>
-                <span class="step-name">Trip Details</span>
+          </label>
+          <label class="radio-card">
+            <input type="radio" name="budget_level" value="3">
+            <div class="radio-card-content">
+              <strong>Mid-Range</strong>
+              <small>3-star, nice restaurants</small>
             </div>
-            <div class="step" data-step="4">
-                <span class="step-number">4</span>
-                <span class="step-name">Review</span>
+          </label>
+          <label class="radio-card">
+            <input type="radio" name="budget_level" value="4">
+            <div class="radio-card-content">
+              <strong>Upscale</strong>
+              <small>4-star, fine dining</small>
             </div>
+          </label>
+          <label class="radio-card">
+            <input type="radio" name="budget_level" value="5">
+            <div class="radio-card-content">
+              <strong>Luxury</strong>
+              <small>5-star, premium experiences</small>
+            </div>
+          </label>
         </div>
+      </div>
 
-        <!-- Step Content Container -->
-        <div id="step-content" class="step-content-container">
-            <!-- Step 1 -->
-            <div class="create-step-content active" id="step-1" style="display: block;">
-                <!-- Step 1 content will be rendered here by CreateStep1.render() -->
+      <!-- Best For (Social Style) -->
+      <div class="characteristic-group">
+        <label class="characteristic-label">Best For</label>
+        <div class="characteristic-options">
+          <label class="radio-card">
+            <input type="radio" name="social_style" value="1">
+            <div class="radio-card-content">
+              <strong>Solo Travelers</strong>
+              <small>Independent exploration</small>
             </div>
-            
-            <!-- Step 2 -->
-            <div class="create-step-content" id="step-2" style="display: none;">
-                <!-- Step 2 content will be rendered here by CreateStep2.render() -->
+          </label>
+          <label class="radio-card">
+            <input type="radio" name="social_style" value="2">
+            <div class="radio-card-content">
+              <strong>Couples</strong>
+              <small>Romantic & intimate</small>
             </div>
-            
-            <!-- Step 3 -->
-            <div class="create-step-content" id="step-3" style="display: none;">
-                <!-- Step 3 content will be rendered here by CreateStep3.render() -->
+          </label>
+          <label class="radio-card">
+            <input type="radio" name="social_style" value="3">
+            <div class="radio-card-content">
+              <strong>Friends</strong>
+              <small>Fun group activities</small>
             </div>
-            
-            <!-- Step 4 -->
-            <div class="create-step-content" id="step-4" style="display: none;">
-                <!-- Step 4 content will be rendered here by CreateStep4.render() -->
+          </label>
+          <label class="radio-card">
+            <input type="radio" name="social_style" value="4">
+            <div class="radio-card-content">
+              <strong>Families</strong>
+              <small>Kid-friendly options</small>
             </div>
+          </label>
+          <label class="radio-card">
+            <input type="radio" name="social_style" value="5">
+            <div class="radio-card-content">
+              <strong>Groups</strong>
+              <small>Large group logistics</small>
+            </div>
+          </label>
         </div>
+      </div>
     </div>
+
+    <!-- Travel Essentials (Optional) -->
+    <div class="essentials-container">
+      <h2>Travel Essentials <span class="optional-badge">Optional</span></h2>
+      <p class="section-description">Add helpful information to make your itinerary more valuable</p>
+      
+      <!-- Transportation -->
+      <div class="essentials-section" id="transportation-section">
+        <div class="section-header" data-action="toggle-essential" data-section="transportation">
+          <div class="header-left">
+            <span class="section-icon">🚕</span>
+            <h3>Transportation</h3>
+            <span class="completion-indicator" id="transport-indicator"></span>
+          </div>
+          <span class="toggle-icon">▼</span>
+        </div>
+        <div class="section-content" style="display: none;">
+          <div class="form-group">
+            <label>Getting There</label>
+            <textarea class="form-control" 
+                      id="getting_there" 
+                      placeholder="Best airports, train stations, or routes to reach the destination"
+                      rows="3"></textarea>
+          </div>
+          <div class="form-group">
+            <label>Getting Around</label>
+            <textarea class="form-control" 
+                      id="getting_around" 
+                      placeholder="Local transport options: metro, buses, taxis, rental cars, etc."
+                      rows="3"></textarea>
+          </div>
+          <div class="form-group">
+            <label>Transport Tips</label>
+            <textarea class="form-control" 
+                      id="local_transport_tips" 
+                      placeholder="Money-saving tips, apps to download, cards to buy, etc."
+                      rows="3"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <!-- Accommodation -->
+      <div class="essentials-section" id="accommodation-section">
+        <div class="section-header" data-action="toggle-essential" data-section="accommodation">
+          <div class="header-left">
+            <span class="section-icon">🏨</span>
+            <h3>Accommodation</h3>
+            <span class="completion-indicator" id="accommodation-indicator"></span>
+          </div>
+          <span class="toggle-icon">▼</span>
+        </div>
+        <div class="section-content" style="display: none;">
+          <div class="form-group">
+            <label>Best Areas to Stay</label>
+            <textarea class="form-control" 
+                      id="area_recommendations" 
+                      placeholder="Recommend neighborhoods for different types of travelers"
+                      rows="3"></textarea>
+          </div>
+          <div class="form-group">
+            <label>Booking Tips</label>
+            <textarea class="form-control" 
+                      id="booking_tips" 
+                      placeholder="Best booking times, platforms to use, things to watch for"
+                      rows="3"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <!-- Travel Tips -->
+      <div class="essentials-section" id="tips-section">
+        <div class="section-header" data-action="toggle-essential" data-section="tips">
+          <div class="header-left">
+            <span class="section-icon">💡</span>
+            <h3>Travel Tips & Advice</h3>
+            <span class="completion-indicator" id="tips-indicator"></span>
+          </div>
+          <span class="toggle-icon">▼</span>
+        </div>
+        <div class="section-content" style="display: none;">
+          <div class="form-group">
+            <label>Best Time to Visit</label>
+            <textarea class="form-control" 
+                      id="best_time_to_visit" 
+                      placeholder="Weather patterns, peak seasons, festivals to catch or avoid"
+                      rows="3"></textarea>
+          </div>
+          <div class="form-group">
+            <label>Visa Requirements</label>
+            <textarea class="form-control" 
+                      id="visa_requirements" 
+                      placeholder="Visa info for major nationalities, processing times"
+                      rows="3"></textarea>
+          </div>
+          <div class="form-group">
+            <label>Packing Suggestions</label>
+            <textarea class="form-control" 
+                      id="packing_suggestions" 
+                      placeholder="Essential items, weather-appropriate clothing, things often forgotten"
+                      rows="3"></textarea>
+          </div>
+          <div class="form-group">
+            <label>Budget Breakdown</label>
+            <textarea class="form-control" 
+                      id="budget_breakdown" 
+                      placeholder="Daily costs, money-saving tips, where to splurge vs save"
+                      rows="3"></textarea>
+          </div>
+          <div class="form-group">
+            <label>Other Tips</label>
+            <textarea class="form-control" 
+                      id="other_tips" 
+                      placeholder="Cultural etiquette, safety advice, local customs, useful apps"
+                      rows="3"></textarea>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="form-actions">
+      <button type="button" class="btn btn-secondary" data-action="back-to-days">
+        ← Back to Days
+      </button>
+      <div>
+        <button type="button" class="btn btn-secondary" data-action="save-step3">
+          Save Trip Details
+        </button>
+        <button type="button" class="btn btn-primary" data-action="continue-to-review">
+          Continue to Review →
+        </button>
+      </div>
+    </div>
+  </div>
 </div>
 
-<!-- Loading Overlay -->
-<div id="loading-overlay" class="loading-overlay">
-    <div class="loading-content">
-        <div class="spinner"></div>
-        <p id="loading-message">Loading...</p>
-    </div>
-</div>
+                <!-- Step 3: Review & Publish (unchanged) -->
+                <div class="create-step-content" id="step-4">
+                    <div id="itinerary-preview" class="itinerary-preview">
+                        <!-- Preview will be generated here -->
+                    </div>
+
+                    <div class="publish-checklist">
+                        <h3>Publishing Checklist</h3>
+                        <p>Make sure your itinerary meets our quality standards:</p>
+                        
+                        <label class="checkbox">
+                            <input type="checkbox" id="check-1">
+                            <span>Each day has at least 3-5 stops</span>
+                        </label>
+                        <label class="checkbox">
+                            <input type="checkbox" id="check-2">
+                            <span>Every stop includes a personal tip</span>
+                        </label>
+                        <label class="checkbox">
+                            <input type="checkbox" id="check-3">
+                            <span>Transportation between areas is explained</span>
+                        </label>
+                        <label class="checkbox">
+                            <input type="checkbox" id="check-4">
+                            <span>Accommodation areas are recommended</span>
+                        </label>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-secondary" data-action="back-to-build">
+                            ← Back to Edit
+                        </button>
+                        <div>
+                            <button type="button" class="btn btn-secondary" data-action="save-draft">
+                                Save as Draft
+                            </button>
+                            <button type="button" class="btn btn-primary btn-publish" data-action="publish">
+                                <span>Publish Itinerary</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
 
         <!-- Dashboard Page -->
         <div id="dashboard-page" class="page">
@@ -294,37 +838,31 @@
 
     <!-- JavaScript Files -->
     <!-- External Libraries -->
-<!-- JavaScript Files -->
-<!-- External Libraries -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
-<!-- API Service -->
-<script src="/js/services/supabase-api.js"></script>
-
-<!-- Core modules -->
-<script src="/js/core/state.js"></script>
-<script src="/js/core/events.js"></script>
-<script src="/js/core/router.js"></script>
-<script src="/js/core/storage.js"></script>
-
-<!-- Components -->
-<script src="/js/components/modal.js"></script>
-<script src="/js/components/toast.js"></script>
-<script src="/js/components/itinerary-card.js"></script>
-<script src="/js/components/trip-modal.js"></script>
-
-<!-- Pages -->
-<script src="/js/pages/feed.js"></script>
-<script src="/js/pages/drafts.js"></script>
-
-<!-- Create Flow Modules (Order matters!) -->
-<script src="/js/pages/create-step1.js"></script>
-<script src="/js/pages/create-step2.js"></script>
-<script src="/js/pages/create-step3.js"></script>
-<script src="/js/pages/create-step4.js"></script>
-<script src="/js/pages/create-controller.js"></script>
-
-<!-- Main app -->
-<script src="/js/app.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
+    <!-- API Service -->
+    <script src="/js/services/supabase-api.js"></script>
+    
+    <!-- Core modules -->
+    <script src="/js/core/state.js"></script>
+    <script src="/js/core/events.js"></script>
+    <script src="/js/core/router.js"></script>
+    <script src="/js/core/storage.js"></script>
+    
+    <!-- Components -->
+    <script src="/js/components/modal.js"></script>
+    <script src="/js/components/toast.js"></script>
+    
+    <!-- Pages -->
+    <script src="/js/pages/feed.js"></script>
+    <script src="/js/pages/drafts.js"></script>  <!-- Add this line -->
+    <script src="/js/pages/create-step1.js"></script>
+    <script src="/js/pages/create-step2.js"></script>
+    <script src="/js/pages/create-step3.js"></script>
+    <script src="/js/pages/create-step4.js"></script>
+    <script src="/js/pages/create-controller.js"></script>
+    
+    <!-- Main app -->
+    <script src="/js/app.js"></script>
 </body>
 </html>
