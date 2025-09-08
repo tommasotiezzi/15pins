@@ -120,19 +120,16 @@ const Router = (() => {
     }
 
     // Check authentication
-    if (routeConfig.requiresAuth) {
+    if (routeConfig && routeConfig.requiresAuth) {
       const user = State.get('currentUser');
       if (!user) {
-        Events.emit('toast', {
-          message: 'Please sign in to continue',
-          type: 'error'
-        });
+        Toast.error('Please sign in to continue');
         
         // Store intended route for after login
         State.set('auth.intendedRoute', route);
         
         // Show login modal instead of navigating
-        Events.emit('modal:open', { type: 'login' });
+        Events.emit('action:login');
         return;
       }
     }
@@ -147,7 +144,9 @@ const Router = (() => {
     }
 
     // Update document title
-    document.title = `${routeConfig.title} - Wanderlist`;
+    if (routeConfig) {
+      document.title = `${routeConfig.title} - Wanderlist`;
+    }
 
     // Deactivate current route
     if (currentRoute) {
@@ -174,17 +173,14 @@ const Router = (() => {
    * Deactivate current route
    */
   const deactivateRoute = (route) => {
-    // Hide current page
-    const pageEl = document.getElementById(`${route.name}-page`);
-    if (pageEl) {
-      pageEl.classList.remove('active');
-    }
+    // Hide ALL pages first
+    document.querySelectorAll('.page').forEach(page => {
+      page.classList.remove('active');
+    });
 
     // Update nav links
     document.querySelectorAll('[data-page]').forEach(link => {
-      if (link.dataset.page === route.name) {
-        link.classList.remove('active');
-      }
+      link.classList.remove('active');
     });
 
     // Emit deactivate event
@@ -198,13 +194,17 @@ const Router = (() => {
     // Show new page
     const pageEl = document.getElementById(`${route.name}-page`);
     if (pageEl) {
+      // Hide all pages first
+      document.querySelectorAll('.page').forEach(page => {
+        page.classList.remove('active');
+      });
+      
+      // Show the target page
       pageEl.classList.add('active');
       
       // Update nav links
       document.querySelectorAll('[data-page]').forEach(link => {
-        if (link.dataset.page === route.name) {
-          link.classList.add('active');
-        }
+        link.classList.toggle('active', link.dataset.page === route.name);
       });
     }
 

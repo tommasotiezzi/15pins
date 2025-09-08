@@ -117,6 +117,7 @@ const CreatePage = (() => {
 
   /**
    * Continue existing draft (called from drafts page)
+   * FIXED: Properly transforms Supabase structure to UI structure
    */
   const continueDraft = async ({ draftId }) => {
     // Load draft from backend
@@ -129,7 +130,34 @@ const CreatePage = (() => {
     }
     
     currentDraftId = draftId;
-    currentDraft = draft;
+    
+    // Transform the Supabase structure (draft_days/draft_stops) to UI structure (days/stops)
+    currentDraft = {
+      ...draft,
+      // Map draft_days to days for UI compatibility
+      days: (draft.draft_days || []).map(day => ({
+        day_number: day.day_number,
+        title: day.title || `Day ${day.day_number}`,
+        description: day.description || '',
+        // Map draft_stops to stops
+        stops: (day.draft_stops || []).map(stop => ({
+          name: stop.name || '',
+          type: stop.type || 'attraction',
+          position: stop.position,
+          tip: stop.tip || '',
+          time_period: stop.time_period || '',
+          location: stop.location || '',
+          start_time: stop.start_time || '',
+          duration_minutes: stop.duration_minutes || 60,
+          cost_cents: stop.cost_cents || 0,
+          description: stop.description || '',
+          link: stop.link || '',
+          lat: stop.lat,
+          lng: stop.lng
+        }))
+      }))
+    };
+    
     currentStep = draft.current_step || 2;
     hasUnsavedChanges = false;
     
@@ -163,7 +191,7 @@ const CreatePage = (() => {
     // Get selected price tier
     const priceTier = parseInt(data.product_type);
     
-    console.log('Creating draft with tier:', priceTier);
+    console.log('Creating/updating draft with tier:', priceTier);
     
     if (!currentDraftId) {
       // Create new draft
@@ -181,7 +209,14 @@ const CreatePage = (() => {
       currentDraft = draft;
     }
     
-    // Prepare draft data
+    // Update current draft with form data
+    currentDraft.title = data.title;
+    currentDraft.destination = data.destination;
+    currentDraft.duration_days = parseInt(data.duration);
+    currentDraft.description = data.description;
+    currentDraft.price_tier = priceTier;
+    
+    // Prepare draft data for saving
     const draftData = {
       title: data.title,
       destination: data.destination,
@@ -189,7 +224,7 @@ const CreatePage = (() => {
       description: data.description,
       price_tier: priceTier,
       current_step: 2,
-      days: createDefaultDays(parseInt(data.duration), priceTier)
+      days: currentDraft.days || createDefaultDays(parseInt(data.duration), priceTier)
     };
     
     // Save to backend
@@ -832,7 +867,7 @@ const CreatePage = (() => {
   };
 
   /**
-   * Save draft - FIXED with proper data structure
+   * Save draft - Uses the transformed 'days' structure
    */
   const saveDraft = async () => {
     if (!currentDraftId || !currentDraft) {
@@ -849,7 +884,7 @@ const CreatePage = (() => {
       button.textContent = 'Saving...';
     }
     
-    // Prepare the data in the format the API expects
+    // Prepare the data - use the transformed 'days' structure
     const draftData = {
       title: currentDraft.title,
       destination: currentDraft.destination,
@@ -858,15 +893,7 @@ const CreatePage = (() => {
       cover_image_url: currentDraft.cover_image_url,
       current_step: currentStep,
       price_tier: currentDraft.price_tier,
-      days: currentDraft.days.map(day => ({
-        day_number: day.day_number,
-        title: day.title,
-        description: day.description,
-        stops: (day.stops || []).map((stop, index) => ({
-          ...stop,
-          position: index + 1
-        }))
-      }))
+      days: currentDraft.days  // This is already in the right format from our UI operations
     };
     
     console.log('Saving draft data:', draftData);
