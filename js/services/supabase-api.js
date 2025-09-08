@@ -754,6 +754,147 @@ async get(draftId) {
   return { data, error };
 },
 
+// Add these methods to your API.drafts object in supabase-api.js
+
+async getCharacteristics(draftId) {
+  const { data, error } = await supabase
+    .from('draft_characteristics')
+    .select('*')
+    .eq('draft_id', draftId)
+    .single();
+  return { data, error };
+},
+
+async saveCharacteristics(draftId, characteristics) {
+  // Upsert characteristics
+  const { data, error } = await supabase
+    .from('draft_characteristics')
+    .upsert({
+      draft_id: draftId,
+      physical_demand: characteristics.physical_demand,
+      cultural_immersion: characteristics.cultural_immersion,
+      pace: characteristics.pace,
+      budget_level: characteristics.budget_level,
+      social_style: characteristics.social_style,
+      updated_at: new Date().toISOString()
+    }, {
+      onConflict: 'draft_id'
+    })
+    .select()
+    .single();
+  
+  // Mark characteristics as completed in drafts table
+  if (!error) {
+    await supabase
+      .from('drafts')
+      .update({ 
+        characteristics_completed: true,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', draftId);
+  }
+  
+  return { data, error };
+},
+
+async getTransportation(draftId) {
+  const { data, error } = await supabase
+    .from('draft_transportation')
+    .select('*')
+    .eq('draft_id', draftId)
+    .single();
+  return { data, error };
+},
+
+async saveTransportation(draftId, transportation) {
+  const { data, error } = await supabase
+    .from('draft_transportation')
+    .upsert({
+      draft_id: draftId,
+      getting_there: transportation.getting_there || null,
+      getting_around: transportation.getting_around || null,
+      local_transport_tips: transportation.local_transport_tips || null,
+      updated_at: new Date().toISOString()
+    }, {
+      onConflict: 'draft_id'
+    })
+    .select()
+    .single();
+  
+  return { data, error };
+},
+
+async getAccommodation(draftId) {
+  const { data, error } = await supabase
+    .from('draft_accommodation')
+    .select('*')
+    .eq('draft_id', draftId)
+    .single();
+  return { data, error };
+},
+
+async saveAccommodation(draftId, accommodation) {
+  const { data, error } = await supabase
+    .from('draft_accommodation')
+    .upsert({
+      draft_id: draftId,
+      area_recommendations: accommodation.area_recommendations || null,
+      booking_tips: accommodation.booking_tips || null,
+      hotel_suggestions: accommodation.hotel_suggestions || [],
+      updated_at: new Date().toISOString()
+    }, {
+      onConflict: 'draft_id'
+    })
+    .select()
+    .single();
+  
+  return { data, error };
+},
+
+async getTravelTips(draftId) {
+  const { data, error } = await supabase
+    .from('draft_travel_tips')
+    .select('*')
+    .eq('draft_id', draftId)
+    .single();
+  return { data, error };
+},
+
+async saveTravelTips(draftId, tips) {
+  const { data, error } = await supabase
+    .from('draft_travel_tips')
+    .upsert({
+      draft_id: draftId,
+      best_time_to_visit: tips.best_time_to_visit || null,
+      visa_requirements: tips.visa_requirements || null,
+      packing_suggestions: tips.packing_suggestions || null,
+      budget_breakdown: tips.budget_breakdown || null,
+      other_tips: tips.other_tips || null,
+      updated_at: new Date().toISOString()
+    }, {
+      onConflict: 'draft_id'
+    })
+    .select()
+    .single();
+  
+  return { data, error };
+},
+
+async getAllEssentials(draftId) {
+  const [transport, accommodation, tips] = await Promise.all([
+    this.getTransportation(draftId),
+    this.getAccommodation(draftId),
+    this.getTravelTips(draftId)
+  ]);
+  
+  return {
+    transportation: transport.data,
+    accommodation: accommodation.data,
+    travel_tips: tips.data,
+    has_any: !!(transport.data || accommodation.data || tips.data)
+  };
+},
+
   /**
    * Storage methods for images
    */
