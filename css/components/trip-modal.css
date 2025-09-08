@@ -1,0 +1,615 @@
+/**
+ * Trip Details Modal Styles
+ * Place in: css/components/trip-modal.css
+ */
+
+/* ==================== Modal Container ==================== */
+.trip-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 9999;
+  display: none;
+}
+
+.trip-modal.active {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.trip-modal-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+}
+
+.trip-modal-content {
+  position: relative;
+  background: var(--white);
+  width: 90%;
+  max-width: 900px;
+  max-height: 90vh;
+  overflow-y: auto;
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-2xl);
+  animation: modalSlideIn 0.3s ease-out;
+}
+
+@keyframes modalSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(30px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* ==================== Modal Close Button ==================== */
+.trip-modal-close {
+  position: sticky;
+  top: var(--space-md);
+  right: var(--space-md);
+  float: right;
+  margin: var(--space-md);
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-full);
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(10px);
+  border: 2px solid var(--border-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  z-index: 10;
+}
+
+.trip-modal-close:hover {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: var(--white);
+  transform: rotate(90deg);
+}
+
+/* ==================== Modal Header ==================== */
+.trip-modal-header {
+  position: relative;
+  border-bottom: 2px solid var(--border-light);
+  padding-bottom: var(--space-xl);
+  margin-bottom: var(--space-xl);
+}
+
+.trip-modal-cover {
+  width: 100%;
+  height: 300px;
+  object-fit: cover;
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+  margin: -1px -1px var(--space-xl) -1px;
+}
+
+.trip-modal-cover-placeholder {
+  width: 100%;
+  height: 200px;
+  background: linear-gradient(135deg, var(--primary-alpha-10), var(--secondary-alpha-10));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+  margin: -1px -1px var(--space-xl) -1px;
+}
+
+.trip-modal-title-section {
+  padding: 0 var(--space-2xl);
+}
+
+.trip-modal-title-section h1 {
+  font-size: var(--text-3xl);
+  font-weight: var(--font-bold);
+  color: var(--text-primary);
+  margin-bottom: var(--space-md);
+  line-height: 1.2;
+}
+
+.trip-modal-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-lg);
+  font-size: var(--text-lg);
+  color: var(--text-secondary);
+  margin-bottom: var(--space-md);
+}
+
+.trip-modal-meta span {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.trip-modal-price {
+  font-weight: var(--font-bold);
+  color: var(--primary);
+  font-size: var(--text-xl);
+}
+
+.trip-modal-description {
+  color: var(--text-secondary);
+  line-height: var(--leading-relaxed);
+  font-size: var(--text-base);
+}
+
+.preview-badge {
+  position: absolute;
+  top: var(--space-lg);
+  right: var(--space-lg);
+  background: var(--warning);
+  color: var(--gray-900);
+  padding: var(--space-xs) var(--space-md);
+  border-radius: var(--radius-full);
+  font-weight: var(--font-semibold);
+  font-size: var(--text-sm);
+}
+
+/* ==================== Characteristics Display ==================== */
+.trip-characteristics-display {
+  padding: 0 var(--space-2xl);
+  margin-bottom: var(--space-2xl);
+}
+
+.trip-characteristics-display h2 {
+  font-size: var(--text-xl);
+  font-weight: var(--font-semibold);
+  margin-bottom: var(--space-lg);
+  color: var(--text-primary);
+}
+
+.characteristics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--space-lg);
+}
+
+.characteristic-item {
+  background: var(--bg-secondary);
+  padding: var(--space-md);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-light);
+}
+
+.char-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-sm);
+}
+
+.char-icon {
+  font-size: var(--text-xl);
+}
+
+.char-title {
+  font-weight: var(--font-medium);
+  color: var(--text-primary);
+  font-size: var(--text-sm);
+}
+
+.char-value {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.char-dots {
+  display: flex;
+  gap: var(--space-xs);
+}
+
+.char-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: var(--radius-full);
+  background: var(--gray-300);
+  transition: all var(--transition-fast);
+}
+
+.char-dot.filled {
+  background: var(--primary);
+  box-shadow: 0 0 0 2px var(--primary-alpha-20);
+}
+
+.char-label {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  font-weight: var(--font-medium);
+}
+
+/* ==================== Quick Stats ==================== */
+.trip-quick-stats {
+  display: flex;
+  justify-content: space-around;
+  padding: var(--space-lg) var(--space-2xl);
+  background: var(--bg-secondary);
+  border-top: 1px solid var(--border-light);
+  border-bottom: 1px solid var(--border-light);
+  margin-bottom: var(--space-2xl);
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.stat-value {
+  font-size: var(--text-2xl);
+  font-weight: var(--font-bold);
+  color: var(--primary);
+}
+
+.stat-label {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* ==================== Days Section ==================== */
+.trip-days-section {
+  padding: 0 var(--space-2xl);
+  margin-bottom: var(--space-2xl);
+}
+
+.trip-days-section h2 {
+  font-size: var(--text-xl);
+  font-weight: var(--font-semibold);
+  margin-bottom: var(--space-lg);
+  color: var(--text-primary);
+}
+
+.days-container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.trip-day-item {
+  border: 2px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  transition: all var(--transition-fast);
+}
+
+.trip-day-item:hover {
+  border-color: var(--primary-alpha-20);
+  box-shadow: var(--shadow-sm);
+}
+
+.day-header {
+  padding: var(--space-md) var(--space-lg);
+  background: var(--bg-secondary);
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: all var(--transition-fast);
+}
+
+.day-header:hover {
+  background: var(--bg-tertiary);
+}
+
+.day-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+.day-number {
+  background: var(--primary);
+  color: var(--white);
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: var(--radius-full);
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+}
+
+.day-title strong {
+  font-size: var(--text-lg);
+  color: var(--text-primary);
+}
+
+.day-stops-count {
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+
+.day-toggle-icon {
+  transition: transform var(--transition-fast);
+  color: var(--text-secondary);
+}
+
+.day-content {
+  padding: var(--space-lg);
+  background: var(--white);
+  border-top: 1px solid var(--border-light);
+}
+
+.day-description {
+  color: var(--text-secondary);
+  margin-bottom: var(--space-md);
+  font-style: italic;
+}
+
+.stops-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.no-stops {
+  color: var(--text-light);
+  text-align: center;
+  padding: var(--space-lg);
+  font-style: italic;
+}
+
+/* ==================== Stop Details ==================== */
+.stop-detail {
+  padding: var(--space-md);
+  background: var(--bg-secondary);
+  border-radius: var(--radius-md);
+  border-left: 4px solid var(--primary-alpha-20);
+}
+
+.stop-detail .stop-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-sm);
+  cursor: default;
+  background: transparent;
+  padding: 0;
+}
+
+.stop-number {
+  width: 24px;
+  height: 24px;
+  background: var(--primary);
+  color: var(--white);
+  border-radius: var(--radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  flex-shrink: 0;
+}
+
+.stop-icon {
+  font-size: var(--text-lg);
+}
+
+.stop-name {
+  font-weight: var(--font-semibold);
+  color: var(--text-primary);
+}
+
+.stop-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-md);
+  margin: var(--space-sm) 0;
+  padding-left: calc(24px + var(--space-sm));
+}
+
+.meta-item {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.stop-description {
+  color: var(--text-secondary);
+  line-height: var(--leading-relaxed);
+  margin: var(--space-sm) 0;
+  padding-left: calc(24px + var(--space-sm));
+}
+
+.stop-location {
+  font-size: var(--text-sm);
+  color: var(--text-light);
+  margin-top: var(--space-sm);
+  padding-left: calc(24px + var(--space-sm));
+}
+
+/* ==================== Essentials Section ==================== */
+.trip-essentials-section {
+  padding: var(--space-xl) var(--space-2xl);
+  background: var(--bg-secondary);
+  border-top: 2px solid var(--border-light);
+}
+
+.trip-essentials-section h2 {
+  font-size: var(--text-xl);
+  font-weight: var(--font-semibold);
+  margin-bottom: var(--space-xl);
+  color: var(--text-primary);
+}
+
+.essential-block {
+  background: var(--white);
+  padding: var(--space-lg);
+  border-radius: var(--radius-lg);
+  margin-bottom: var(--space-lg);
+  border: 1px solid var(--border-light);
+}
+
+.essential-block h3 {
+  font-size: var(--text-lg);
+  font-weight: var(--font-semibold);
+  margin-bottom: var(--space-md);
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.essential-item {
+  margin-bottom: var(--space-md);
+  padding-bottom: var(--space-md);
+  border-bottom: 1px solid var(--border-light);
+}
+
+.essential-item:last-child {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.essential-item strong {
+  display: block;
+  color: var(--text-primary);
+  margin-bottom: var(--space-xs);
+  font-size: var(--text-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.essential-item p {
+  color: var(--text-secondary);
+  line-height: var(--leading-relaxed);
+}
+
+/* ==================== Modal Footer ==================== */
+.trip-modal-footer {
+  padding: var(--space-xl) var(--space-2xl);
+  border-top: 2px solid var(--border-light);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--white);
+  border-radius: 0 0 var(--radius-xl) var(--radius-xl);
+}
+
+.creator-info {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+.creator-avatar {
+  width: 50px;
+  height: 50px;
+  border-radius: var(--radius-full);
+  object-fit: cover;
+  border: 2px solid var(--border-light);
+}
+
+.creator-info strong {
+  display: block;
+  color: var(--text-primary);
+  margin-bottom: var(--space-xs);
+}
+
+.creator-info p {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.action-buttons {
+  display: flex;
+  gap: var(--space-md);
+}
+
+.btn-purchase {
+  font-weight: var(--font-bold);
+  padding: var(--space-md) var(--space-xl);
+}
+
+/* ==================== Scrollbar Styling ==================== */
+.trip-modal-content::-webkit-scrollbar {
+  width: 10px;
+}
+
+.trip-modal-content::-webkit-scrollbar-track {
+  background: var(--bg-secondary);
+  border-radius: 0 var(--radius-xl) var(--radius-xl) 0;
+}
+
+.trip-modal-content::-webkit-scrollbar-thumb {
+  background: var(--gray-400);
+  border-radius: var(--radius-full);
+}
+
+.trip-modal-content::-webkit-scrollbar-thumb:hover {
+  background: var(--gray-500);
+}
+
+/* ==================== Responsive Design ==================== */
+@media (max-width: 768px) {
+  .trip-modal-content {
+    width: 100%;
+    height: 100%;
+    max-width: 100%;
+    max-height: 100%;
+    border-radius: 0;
+  }
+  
+  .trip-modal-cover {
+    height: 200px;
+    border-radius: 0;
+  }
+  
+  .trip-modal-title-section {
+    padding: 0 var(--space-lg);
+  }
+  
+  .trip-modal-title-section h1 {
+    font-size: var(--text-2xl);
+  }
+  
+  .characteristics-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .trip-quick-stats {
+    padding: var(--space-md);
+    gap: var(--space-md);
+  }
+  
+  .stat-value {
+    font-size: var(--text-xl);
+  }
+  
+  .trip-days-section,
+  .trip-characteristics-display {
+    padding: 0 var(--space-lg);
+  }
+  
+  .trip-modal-footer {
+    flex-direction: column;
+    gap: var(--space-lg);
+    padding: var(--space-lg);
+  }
+  
+  .action-buttons {
+    width: 100%;
+    flex-direction: column;
+  }
+  
+  .action-buttons .btn {
+    width: 100%;
+  }
+}
