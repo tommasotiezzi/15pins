@@ -1,6 +1,6 @@
 /**
  * Create Step 4 - Review & Publish
- * Fixed preview with manual checklist
+ * Fixed preview with manual checklist and dynamic colors
  */
 
 const CreateStep4 = (() => {
@@ -19,6 +19,13 @@ const CreateStep4 = (() => {
       }
       CreateController.handleStepTransition(4, 2);
     });
+  };
+
+  // ============= GET CHECKLIST COLOR CLASS =============
+  const getChecklistColorClass = (checkedCount) => {
+    if (checkedCount === 0) return 'checklist-red';
+    if (checkedCount === 5) return 'checklist-green';
+    return 'checklist-yellow'; // partial completion
   };
 
   // ============= RENDER STEP =============
@@ -56,7 +63,7 @@ const CreateStep4 = (() => {
           <!-- Right Column: Checklist & Actions -->
           <div class="checklist-column">
             <!-- Manual Quality Checklist -->
-            <div class="publish-checklist">
+            <div class="publish-checklist checklist-red" id="quality-checklist">
               <h3>📋 Final Quality Check</h3>
               <p>Please confirm you've completed these items:</p>
               
@@ -149,6 +156,24 @@ const CreateStep4 = (() => {
           </div>
         </div>
       </div>
+      
+      <!-- Add CSS for checklist colors -->
+      <style>
+        .publish-checklist.checklist-red {
+          background: #ffebee !important;
+          border-color: #ffcdd2 !important;
+        }
+        
+        .publish-checklist.checklist-yellow {
+          background: #fff8e1 !important;
+          border-color: #ffe082 !important;
+        }
+        
+        .publish-checklist.checklist-green {
+          background: #e8f5e9 !important;
+          border-color: #a5d6a7 !important;
+        }
+      </style>
     `;
     
     // Initialize card click handler for preview
@@ -162,21 +187,27 @@ const CreateStep4 = (() => {
   const setupChecklistHandlers = () => {
     const checkboxes = document.querySelectorAll('.publish-checklist input[type="checkbox"]');
     checkboxes.forEach(checkbox => {
-      checkbox.addEventListener('change', updatePublishButton);
+      checkbox.addEventListener('change', updateChecklistState);
     });
     
-    // Initial publish button state
-    updatePublishButton();
+    // Initial state
+    updateChecklistState();
   };
 
-  // ============= UPDATE PUBLISH BUTTON =============
-  const updatePublishButton = () => {
+  // ============= UPDATE CHECKLIST STATE =============
+  const updateChecklistState = () => {
     const publishBtn = document.querySelector('[data-action="publish"]');
-    if (!publishBtn) return;
+    const checklist = document.getElementById('quality-checklist');
+    if (!publishBtn || !checklist) return;
     
     const checkboxes = document.querySelectorAll('.publish-checklist input[type="checkbox"]');
-    const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+    const checkedCount = Array.from(checkboxes).filter(cb => cb.checked).length;
+    const allChecked = checkedCount === 5;
     
+    // Update checklist background color
+    checklist.className = `publish-checklist ${getChecklistColorClass(checkedCount)}`;
+    
+    // Update publish button
     publishBtn.disabled = !allChecked;
     
     if (allChecked) {
@@ -212,7 +243,8 @@ const CreateStep4 = (() => {
         username: currentUser?.username || currentUser?.profile?.username || 'You',
         avatar_url: currentUser?.avatar_url || currentUser?.profile?.avatar_url || 'https://i.pravatar.cc/32',
         bio: currentUser?.bio || currentUser?.profile?.bio || ''
-      }
+      },
+      context: 'preview' // Important: set context
     };
     
     // Use ItineraryCard component if available
@@ -227,7 +259,7 @@ const CreateStep4 = (() => {
   // ============= FALLBACK CARD RENDER =============
   const renderFallbackCard = (itinerary) => {
     return `
-      <div class="itinerary-card-fallback" onclick="CreateStep4.openPreviewModal()">
+      <div class="itinerary-card-fallback" data-itinerary-id="preview" data-context="preview">
         <div class="card-image">
           ${itinerary.cover_image_url ? 
             `<img src="${itinerary.cover_image_url}" alt="${itinerary.title}">` :
@@ -256,54 +288,57 @@ const CreateStep4 = (() => {
 
   // ============= SETUP CARD PREVIEW =============
   const setupCardPreview = (draft, currentUser) => {
-    // Override the card click to use draft data directly
-    const card = document.querySelector('.itinerary-card[data-itinerary-id="preview"]');
-    if (card) {
-      card.onclick = (e) => {
+    // Setup click handler for both card types
+    const cards = document.querySelectorAll('[data-itinerary-id="preview"], .itinerary-card-fallback');
+    
+    cards.forEach(card => {
+      card.addEventListener('click', (e) => {
+        // Don't trigger on button clicks
+        if (e.target.tagName === 'BUTTON') return;
+        
         e.preventDefault();
         e.stopPropagation();
-        openPreviewModal(draft, currentUser);
-      };
-    }
-  };
-
-  // ============= OPEN PREVIEW MODAL =============
-  const openPreviewModal = (draft, currentUser) => {
-    if (!draft) {
-      draft = CreateController.getCurrentDraft();
-    }
-    if (!draft) return;
-    
-    if (!currentUser) {
-      currentUser = State.get('currentUser');
-    }
-    
-    // Transform draft for modal
-    const itineraryPreview = {
-      id: 'preview',
-      title: draft.title,
-      destination: draft.destination,
-      duration_days: draft.duration_days,
-      description: draft.description,
-      price_tier: draft.price_tier,
-      cover_image_url: draft.cover_image_url,
-      days: draft.days || [],
-      characteristics: draft.characteristics,
-      transportation: draft.transportation,
-      accommodation: draft.accommodation,
-      travel_tips: draft.travel_tips,
-      creator: {
-        username: currentUser?.username || currentUser?.profile?.username || 'You',
-        avatar_url: currentUser?.avatar_url || currentUser?.profile?.avatar_url,
-        bio: currentUser?.bio || currentUser?.profile?.bio
-      }
-    };
-    
-    // Emit event for TripModal
-    Events.emit('trip-modal:open', { 
-      itinerary: itineraryPreview, 
-      context: 'preview' 
+        
+        // For preview context, pass the draft data directly
+        const itineraryForModal = {
+          id: 'preview',
+          title: draft.title,
+          destination: draft.destination,
+          duration_days: draft.duration_days,
+          description: draft.description,
+          price_tier: draft.price_tier,
+          cover_image_url: draft.cover_image_url,
+          days: draft.days || [],
+          characteristics: draft.characteristics,
+          transportation: draft.transportation,
+          accommodation: draft.accommodation,
+          travel_tips: draft.travel_tips,
+          total_sales: 0,
+          view_count: 0,
+          creator: {
+            username: currentUser?.username || currentUser?.profile?.username || 'You',
+            avatar_url: currentUser?.avatar_url || currentUser?.profile?.avatar_url,
+            bio: currentUser?.bio || currentUser?.profile?.bio
+          }
+        };
+        
+        // Emit event for TripModal with draft data
+        Events.emit('trip-modal:open', { 
+          itinerary: itineraryForModal, 
+          context: 'preview',
+          isDraft: true // Flag to indicate this is draft data
+        });
+      });
     });
+    
+    // Handle "Continue Editing" button if ItineraryCard rendered it
+    const editBtn = document.querySelector('[data-action="back-to-build"]');
+    if (editBtn) {
+      editBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        Events.emit('action:back-to-build');
+      });
+    }
   };
 
   // ============= HANDLE PUBLISH =============
@@ -417,8 +452,7 @@ const CreateStep4 = (() => {
     init,
     render,
     saveStep,
-    validateStep,
-    openPreviewModal // Expose for fallback onclick
+    validateStep
   };
 })();
 
