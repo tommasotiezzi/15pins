@@ -443,10 +443,6 @@ const CreateStep1 = (() => {
     const { error } = await API.drafts.update(draftId, draftData);
     if (error) throw error;
     
-    // Update local draft
-    const draft = CreateController.getCurrentDraft();
-    Object.assign(draft, draftData);
-    
     return true;
   };
 
