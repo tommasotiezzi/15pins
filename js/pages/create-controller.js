@@ -148,8 +148,25 @@ const CreateController = (() => {
     await loadDraft(draftId);
   };
 
+  // Track if we're currently loading a draft
+  let isLoadingDraft = false;
+  
   // ============= LOAD DRAFT FROM DATABASE =============
   const loadDraft = async (draftId) => {
+    // Prevent concurrent draft loads
+    if (isLoadingDraft) {
+      console.log('Already loading a draft, ignoring request');
+      return;
+    }
+    
+    // If currently saving, wait
+    if (isSaving) {
+      Toast.show('Please wait for save to complete...');
+      return;
+    }
+    
+    isLoadingDraft = true;
+    
     // Clear any existing state first
     if (currentDraftId && currentDraftId !== draftId) {
       console.log('Switching from draft', currentDraftId, 'to', draftId);
@@ -158,6 +175,8 @@ const CreateController = (() => {
       currentStep = 1;
     }
     
+    // Hide any existing overlay first, then show new one
+    hideLoadingOverlay();
     showLoadingOverlay('Loading draft...');
     
     try {
@@ -166,6 +185,8 @@ const CreateController = (() => {
       if (!user) {
         Toast.error('Please log in to continue');
         Router.navigate('feed');
+        hideLoadingOverlay(); // ENSURE HIDDEN
+        isLoadingDraft = false;
         return;
       }
       
@@ -180,19 +201,25 @@ const CreateController = (() => {
           Toast.error('Failed to load draft');
         }
         showDraftSelector();
+        hideLoadingOverlay(); // ENSURE HIDDEN
+        isLoadingDraft = false;
         return;
       }
       
       if (!draft) {
         Toast.error('Draft not found');
         showDraftSelector();
+        hideLoadingOverlay(); // ENSURE HIDDEN
+        isLoadingDraft = false;
         return;
       }
       
-      // Verify draft belongs to current user
-      if (draft.user_id !== user.id) {
+      // Verify draft belongs to current user (if user_id exists on draft)
+      if (draft.user_id && user.id && draft.user_id !== user.id) {
         Toast.error('You do not have access to this draft');
         showDraftSelector();
+        hideLoadingOverlay(); // ENSURE HIDDEN
+        isLoadingDraft = false;
         return;
       }
       
@@ -223,7 +250,9 @@ const CreateController = (() => {
       Toast.error('Failed to load draft');
       showDraftSelector();
     } finally {
+      // ALWAYS hide overlay and reset flag
       hideLoadingOverlay();
+      isLoadingDraft = false;
     }
   };
 
