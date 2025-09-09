@@ -114,8 +114,15 @@ const ItineraryCard = (() => {
     
     console.log('Card received itinerary:', itinerary);
     console.log('Looking for characteristics, found:', chars);
+    console.log('Characteristics keys:', Object.keys(chars));
+    console.log('Characteristics values:', Object.entries(chars));
     
-    if (!chars || Object.keys(chars).length === 0) {
+    // Check if characteristics is empty or has no actual values
+    const hasValidCharacteristics = chars && 
+      Object.keys(chars).length > 0 && 
+      Object.keys(chars).some(key => chars[key] !== null && chars[key] !== undefined);
+    
+    if (!hasValidCharacteristics) {
       return '<div class="card-characteristics-empty">No characteristics set</div>';
     }
     
@@ -128,13 +135,17 @@ const ItineraryCard = (() => {
     ];
     
     const badges = specs
-      .filter(spec => chars[spec.key])
-      .map(spec => {
+      .filter(spec => {
         const value = chars[spec.key];
-        console.log(`Creating badge for ${spec.key}: ${value}`);
+        console.log(`Checking ${spec.key}: value=${value}, type=${typeof value}`);
+        return value !== null && value !== undefined && value > 0;
+      })
+      .map(spec => {
+        const value = parseInt(chars[spec.key]);
+        console.log(`Creating badge for ${spec.key}: ${value} -> ${spec.labels[value - 1]}`);
         return `
           <span class="char-badge">
-            ${spec.icon} ${spec.labels[value - 1]}
+            ${spec.icon} ${spec.labels[value - 1] || 'Unknown'}
           </span>
         `;
       });
