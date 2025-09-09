@@ -292,13 +292,18 @@ const CreateStep4 = (() => {
 
   // ============= RENDER MARKETPLACE CARD =============
   const renderMarketplaceCard = (draft, currentUser) => {
-    // Debug what we're actually getting from the database
     console.log('Full draft object from DB:', draft);
-    console.log('Draft keys:', Object.keys(draft));
+    console.log('Draft characteristic columns:', {
+      physical_demand: draft.physical_demand,
+      cultural_immersion: draft.cultural_immersion,
+      pace: draft.pace,
+      budget_level: draft.budget_level,
+      social_style: draft.social_style
+    });
     
-    // Transform draft to match itinerary structure for the card
-    // The draft object likely has the fields without 'draft_' prefix after API call
+    // Create itinerary preview with ALL draft fields including characteristic columns
     const itineraryPreview = {
+      ...draft, // Spread ALL draft fields first (includes characteristic columns)
       id: 'preview',
       title: draft.title || 'Untitled Itinerary',
       destination: draft.destination || 'Unknown',
@@ -307,15 +312,16 @@ const CreateStep4 = (() => {
       price_tier: draft.price_tier || 9,
       cover_image_url: draft.cover_image_url || '',
       days: draft.days || [],
-      // Try both field names since API might strip the 'draft_' prefix
-      characteristics: draft.characteristics || {},
-      draft_characteristics: draft.draft_characteristics || draft.characteristics || {},
+      // Explicitly include characteristic columns to make sure they're passed
+      physical_demand: draft.physical_demand,
+      cultural_immersion: draft.cultural_immersion,
+      pace: draft.pace,
+      budget_level: draft.budget_level,
+      social_style: draft.social_style,
+      // Transportation, accommodation, travel tips
       transportation: draft.transportation || {},
-      draft_transportation: draft.draft_transportation || draft.transportation || {},
       accommodation: draft.accommodation || {},
-      draft_accommodation: draft.draft_accommodation || draft.accommodation || {},
       travel_tips: draft.travel_tips || {},
-      draft_travel_tips: draft.draft_travel_tips || draft.travel_tips || {},
       total_sales: 0,
       view_count: 0,
       creator: {
@@ -327,8 +333,13 @@ const CreateStep4 = (() => {
       context: 'preview'
     };
     
-    console.log('Created itineraryPreview with characteristics:', itineraryPreview.characteristics);
-    console.log('Created itineraryPreview with draft_characteristics:', itineraryPreview.draft_characteristics);
+    console.log('Created itineraryPreview with characteristic columns:', {
+      physical_demand: itineraryPreview.physical_demand,
+      cultural_immersion: itineraryPreview.cultural_immersion,
+      pace: itineraryPreview.pace,
+      budget_level: itineraryPreview.budget_level,
+      social_style: itineraryPreview.social_style
+    });
     
     // Store for modal access
     window.CreatePage = window.CreatePage || {};
