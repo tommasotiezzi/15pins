@@ -872,23 +872,7 @@
 
         <!-- Dashboard Page -->
         <div id="dashboard-page" class="page">
-            <div class="container">
-                <h1>My Work</h1>
-                
-                <!-- Tabs for drafts vs published -->
-                <div class="dashboard-tabs">
-                    <button class="tab-btn active" data-action="dashboard-tab" data-tab="drafts">
-                        Drafts (<span id="drafts-count">0</span>)
-                    </button>
-                    <button class="tab-btn" data-action="dashboard-tab" data-tab="published">
-                        Published (<span id="published-count">0</span>)
-                    </button>
-                </div>
-                
-                <div id="dashboard-content">
-                    <!-- Content will be rendered here -->
-                </div>
-            </div>
+            <div id="page-content"></div>  <!-- Change to this -->
         </div>
 
         <!-- Profile Page -->
@@ -934,6 +918,7 @@
     
     <!-- Pages -->
     <script src="/js/pages/feed.js"></script>
+    <script src="/js/pages/dashboard.js"></script>  <!-- ADD THIS LINE -->
     <script src="/js/pages/drafts.js"></script>  <!-- Add this line -->
     <script src="/js/pages/create-step1.js"></script>
     <script src="/js/pages/create-step2.js"></script>

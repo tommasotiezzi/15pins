@@ -190,36 +190,42 @@ const Router = (() => {
   /**
    * Activate new route
    */
-  const activateRoute = (route) => {
-    // Show new page
-    const pageEl = document.getElementById(`${route.name}-page`);
-    if (pageEl) {
-      // Hide all pages first
-      document.querySelectorAll('.page').forEach(page => {
-        page.classList.remove('active');
-      });
-      
-      // Show the target page
-      pageEl.classList.add('active');
-      
-      // Update nav links
-      document.querySelectorAll('[data-page]').forEach(link => {
-        link.classList.toggle('active', link.dataset.page === route.name);
-      });
+/**
+ * Activate new route
+ */
+const activateRoute = (route) => {
+  // Show new page
+  const pageEl = document.getElementById(`${route.name}-page`);
+  if (pageEl) {
+    // Hide all pages first
+    document.querySelectorAll('.page').forEach(page => {
+      page.classList.remove('active');
+    });
+    
+    // Show the target page
+    pageEl.classList.add('active');
+    
+    // Update nav links
+    document.querySelectorAll('[data-page]').forEach(link => {
+      link.classList.toggle('active', link.dataset.page === route.name);
+    });
+  }
+
+  // Initialize the page component if it exists
+  const routeConfig = routes.get(route.name);
+  if (routeConfig && routeConfig.component) {
+    const componentName = routeConfig.component;
+    
+    // Check if the component exists and has an init method
+    if (window[componentName] && typeof window[componentName].init === 'function') {
+      // Call the component's init method
+      window[componentName].init();
     }
+  }
 
-    // Emit activate event
-    Events.emit(`page:${route.name}:activate`, route.params);
-  };
-
-  /**
-   * Add navigation guard
-   * @param {function} guard - Guard function (to, from) => boolean|route
-   */
-  const addGuard = (guard) => {
-    guards.push(guard);
-  };
-
+  // Emit activate event
+  Events.emit(`page:${route.name}:activate`, route.params);
+};
   /**
    * Remove navigation guard
    */
