@@ -106,29 +106,83 @@
             <!-- Feed Filters -->
             <section class="feed-filters">
                 <div class="container">
-                    <div class="filter-tabs">
-                        <button class="filter-tab active" data-action="filter-tab" data-filter="recent">Recent</button>
-                        <button class="filter-tab" data-action="filter-tab" data-filter="popular">Popular</button>
-                        <button class="filter-tab" data-action="filter-tab" data-filter="nearby">Nearby</button>
+                    <!-- Search Bar -->
+                    <div class="search-container">
+                        <input type="text" 
+                               class="search-input" 
+                               placeholder="Search destinations, titles, or countries..." 
+                               id="feed-search"
+                               data-action="search-itineraries">
+                        <svg class="search-icon" width="20" height="20" viewBox="0 0 20 20" fill="none">
+                            <circle cx="9" cy="9" r="6" stroke="currentColor" stroke-width="2"/>
+                            <path d="M13.5 13.5L17 17" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        </svg>
                     </div>
+                    
+                    <!-- Filter Tabs -->
+                    <div class="filter-tabs">
+                        <button class="filter-tab active" data-action="filter-tab" data-filter="for-you">For You</button>
+                        <button class="filter-tab" data-action="filter-tab" data-filter="trending">Trending</button>
+                        <button class="filter-tab" data-action="filter-tab" data-filter="new">New</button>
+                        <button class="filter-tab" data-action="filter-tab" data-filter="nearby">Nearby</button>
+                        <button class="filter-tab" data-action="filter-tab" data-filter="following">Following</button>
+                    </div>
+                    
+                    <!-- Filter Dropdowns -->
                     <div class="filter-chips">
                         <select class="filter-select" data-action="filter-select" data-filter-type="destination">
-                            <option value="">All Destinations</option>
+                            <option value="all">All Destinations</option>
                             <option value="europe">Europe</option>
                             <option value="asia">Asia</option>
                             <option value="americas">Americas</option>
+                            <option value="africa">Africa</option>
+                            <option value="oceania">Oceania</option>
                         </select>
                         <select class="filter-select" data-action="filter-select" data-filter-type="duration">
-                            <option value="">Any Duration</option>
-                            <option value="3">Weekend (2-3 days)</option>
-                            <option value="7">Week (4-7 days)</option>
-                            <option value="14">Two Weeks (8-14 days)</option>
-                            <option value="30">Month (15-31 days)</option>
+                            <option value="any">Any Duration</option>
+                            <option value="weekend">Weekend (2-3 days)</option>
+                            <option value="week">Week (4-7 days)</option>
+                            <option value="two-weeks">Two Weeks (8-14 days)</option>
+                            <option value="month">Month+ (15+ days)</option>
                         </select>
                         <select class="filter-select" data-action="filter-select" data-filter-type="price">
-                            <option value="">Any Price</option>
+                            <option value="any">Any Price</option>
                             <option value="9">€9 Basic</option>
                             <option value="19">€19 Detailed</option>
+                        </select>
+                        
+                        <!-- Characteristic Filters -->
+                        <select class="filter-select" data-action="filter-select" data-filter-type="physical_demand">
+                            <option value="any">Any Activity Level</option>
+                            <option value="1">Very Easy</option>
+                            <option value="2">Easy</option>
+                            <option value="3">Moderate</option>
+                            <option value="4">Challenging</option>
+                            <option value="5">Very Challenging</option>
+                        </select>
+                        <select class="filter-select" data-action="filter-select" data-filter-type="budget_level">
+                            <option value="any">Any Budget</option>
+                            <option value="1">Backpacker</option>
+                            <option value="2">Budget</option>
+                            <option value="3">Mid-Range</option>
+                            <option value="4">Upscale</option>
+                            <option value="5">Luxury</option>
+                        </select>
+                        <select class="filter-select" data-action="filter-select" data-filter-type="pace">
+                            <option value="any">Any Pace</option>
+                            <option value="1">Very Relaxed</option>
+                            <option value="2">Relaxed</option>
+                            <option value="3">Moderate</option>
+                            <option value="4">Fast-Paced</option>
+                            <option value="5">Packed</option>
+                        </select>
+                        <select class="filter-select" data-action="filter-select" data-filter-type="best_for">
+                            <option value="any">Best For Anyone</option>
+                            <option value="1">Solo Travelers</option>
+                            <option value="2">Couples</option>
+                            <option value="3">Friends</option>
+                            <option value="4">Families</option>
+                            <option value="5">Groups</option>
                         </select>
                     </div>
                 </div>
@@ -139,7 +193,7 @@
                 <div class="itinerary-grid" id="itinerary-grid">
                     <!-- Cards will be rendered here -->
                 </div>
-                <button class="btn btn-secondary btn-load-more" id="load-more" data-action="load-more">
+                <button class="btn btn-secondary btn-load-more" id="load-more" data-action="load-more" style="display: none;">
                     Load More
                 </button>
             </section>
@@ -172,7 +226,6 @@
             <!-- Creation Flow -->
             <div id="creation-flow" class="create-container">
                 <!-- Current Draft Info Bar -->
-<!-- Current Draft Info Bar -->
                 <div id="draft-info-bar" class="draft-info-bar" style="display: none;">
                     <div style="display: flex; align-items: center;">
                         <span id="draft-title">Untitled Itinerary</span>
