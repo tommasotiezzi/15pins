@@ -242,7 +242,8 @@ const CreateStep1 = (() => {
         document.getElementById('country').value = placeDetails.country || '';
         document.getElementById('country_code').value = placeDetails.countryCode || '';
         document.getElementById('region').value = placeDetails.region || '';
-        document.getElementById('city').value = placeDetails.city || '';
+        // Use the main location name as city if no specific city is found
+        document.getElementById('city').value = placeDetails.city || placeDetails.displayName || placeDetails.region || '';
         document.getElementById('lat').value = placeDetails.lat || '';
         document.getElementById('lng').value = placeDetails.lng || '';
         
