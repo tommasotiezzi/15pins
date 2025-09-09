@@ -58,10 +58,10 @@ const CreateStep1 = (() => {
 
   // ============= HANDLE DESTINATION INPUT =============
   const handleDestinationInput = async (e) => {
-    const query = e.target.value.trim();
+    const query = e.target.value ? e.target.value.trim() : '';
     const suggestionsDiv = document.getElementById('destination-suggestions');
     
-    if (query.length < 3) {
+    if (!query || query.length < 3) {
       suggestionsDiv.classList.remove('active');
       currentSuggestions = [];
       return;
