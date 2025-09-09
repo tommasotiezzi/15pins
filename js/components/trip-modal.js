@@ -9,6 +9,7 @@ const TripModal = (() => {
   let currentContext = 'view'; // 'preview', 'view', 'edit'
   let currentUser = null;
   let isPurchased = false;
+  let modalElement = null;
 
   /**
    * Initialize the modal component
@@ -18,19 +19,56 @@ const TripModal = (() => {
     Events.on('trip-modal:open', open);
     Events.on('trip-modal:close', close);
     
-    // Set up close handlers
-    document.addEventListener('click', (e) => {
-      if (e.target.id === 'trip-modal' || e.target.classList.contains('trip-modal-close')) {
-        close();
-      }
-    });
+    // Create modal element on init
+    createModalElement();
+    
+    // Set up event delegation for modal actions
+    document.addEventListener('click', handleModalClicks);
     
     // Set up keyboard handler
     document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && document.getElementById('trip-modal')?.classList.contains('active')) {
+      if (e.key === 'Escape' && modalElement?.classList.contains('active')) {
         close();
       }
     });
+  };
+
+  /**
+   * Handle all modal click events
+   */
+  const handleModalClicks = (e) => {
+    // Close modal when clicking overlay
+    if (e.target.classList.contains('trip-modal-overlay')) {
+      close();
+      return;
+    }
+    
+    // Close button
+    if (e.target.closest('.trip-modal-close')) {
+      close();
+      return;
+    }
+    
+    // Continue Editing button in preview mode
+    if (e.target.closest('[data-action="back-to-build"]')) {
+      close();
+      Events.emit('create:continue-editing');
+      return;
+    }
+    
+    // Purchase button
+    if (e.target.closest('.btn-purchase')) {
+      handlePurchase();
+      return;
+    }
+    
+    // Wishlist button
+    if (e.target.closest('[data-action="wishlist"]')) {
+      const button = e.target.closest('[data-action="wishlist"]');
+      const itineraryId = button.dataset.id;
+      handleWishlist(itineraryId, button);
+      return;
+    }
   };
 
   /**
@@ -42,7 +80,11 @@ const TripModal = (() => {
     currentContext = data.context || 'view';
     
     // Get current user to check ownership
-    currentUser = await API.auth.getUser();
+    try {
+      currentUser = await API.auth.getUser();
+    } catch (error) {
+      currentUser = null;
+    }
     
     // Check if user owns this itinerary or has purchased it
     const isOwner = currentUser && currentItinerary.creator_id === currentUser.id;
@@ -52,14 +94,12 @@ const TripModal = (() => {
     // In production, you'd check the purchases table
     isPurchased = isOwner || isPreviewMode;
     
-    let modal = document.getElementById('trip-modal');
-    if (!modal) {
+    if (!modalElement) {
       createModalElement();
-      modal = document.getElementById('trip-modal');
     }
     
     renderContent();
-    modal.classList.add('active');
+    modalElement.classList.add('active');
     document.body.style.overflow = 'hidden';
   };
 
@@ -67,9 +107,8 @@ const TripModal = (() => {
    * Close the modal
    */
   const close = () => {
-    const modal = document.getElementById('trip-modal');
-    if (modal) {
-      modal.classList.remove('active');
+    if (modalElement) {
+      modalElement.classList.remove('active');
       document.body.style.overflow = '';
     }
   };
@@ -78,10 +117,16 @@ const TripModal = (() => {
    * Create the modal element if it doesn't exist
    */
   const createModalElement = () => {
-    const modal = document.createElement('div');
-    modal.id = 'trip-modal';
-    modal.className = 'trip-modal';
-    modal.innerHTML = `
+    // Remove existing modal if present
+    const existing = document.getElementById('trip-modal');
+    if (existing) {
+      existing.remove();
+    }
+    
+    modalElement = document.createElement('div');
+    modalElement.id = 'trip-modal';
+    modalElement.className = 'trip-modal';
+    modalElement.innerHTML = `
       <div class="trip-modal-overlay"></div>
       <div class="trip-modal-content">
         <button class="trip-modal-close" aria-label="Close">
@@ -92,7 +137,7 @@ const TripModal = (() => {
         <div id="trip-modal-body"></div>
       </div>
     `;
-    document.body.appendChild(modal);
+    document.body.appendChild(modalElement);
   };
 
   /**
@@ -101,8 +146,7 @@ const TripModal = (() => {
   const calculateStats = (itinerary) => {
     let totalStops = 0;
     let totalCost = 0;
-    let hasAccommodation = false;
-    let hasTransport = false;
+    let stopTypes = new Set();
     
     if (itinerary.days) {
       itinerary.days.forEach(day => {
@@ -112,8 +156,9 @@ const TripModal = (() => {
             if (stop.cost_cents) {
               totalCost += stop.cost_cents;
             }
-            if (stop.type === 'accommodation') hasAccommodation = true;
-            if (stop.type === 'transport') hasTransport = true;
+            if (stop.type) {
+              stopTypes.add(stop.type);
+            }
           });
         }
       });
@@ -122,8 +167,8 @@ const TripModal = (() => {
     return {
       totalStops,
       totalCost,
-      hasAccommodation,
-      hasTransport,
+      hasAccommodation: stopTypes.has('accommodation'),
+      hasTransport: stopTypes.has('transport'),
       avgStopsPerDay: itinerary.duration_days ? (totalStops / itinerary.duration_days).toFixed(1) : 0
     };
   };
@@ -158,7 +203,7 @@ const TripModal = (() => {
       ${renderHeader()}
       ${renderCharacteristics()}
       ${renderQuickStats(stats)}
-      ${!isPurchased ? renderPurchasePrompt() : ''}
+      ${!isPurchased && currentContext !== 'preview' ? renderPurchasePrompt() : ''}
       ${renderDayByDay(isDetailed)}
       ${renderEssentials()}
       ${renderFooter()}
@@ -180,7 +225,7 @@ const TripModal = (() => {
         <div class="prompt-content">
           <h3>🔍 Preview Mode</h3>
           <p>You're viewing a preview with ${daysText} unlocked. Purchase to access all ${currentItinerary.duration_days} days, insider tips, and travel essentials.</p>
-          <button class="btn btn-primary">
+          <button class="btn btn-primary btn-purchase">
             Unlock Full Itinerary - €${currentItinerary.price_tier}
           </button>
         </div>
@@ -225,53 +270,105 @@ const TripModal = (() => {
   };
 
   /**
-   * Render characteristics section
+   * Render characteristics section with full details
    */
   const renderCharacteristics = () => {
     const chars = currentItinerary.characteristics;
     if (!chars) return '';
     
-    const labels = {
-      physical_demand: ['Very Easy', 'Easy', 'Moderate', 'Challenging', 'Very Challenging'],
-      cultural_immersion: ['Tourist Path', 'Some Local', 'Balanced', 'Mostly Local', 'Full Immersion'],
-      pace: ['Very Relaxed', 'Relaxed', 'Moderate', 'Fast', 'Packed'],
-      budget_level: ['Backpacker', 'Budget', 'Mid-Range', 'Upscale', 'Luxury'],
-      social_style: ['Solo', 'Couples', 'Friends', 'Families', 'Groups']
-    };
-    
-    const icons = {
-      physical_demand: '💪',
-      cultural_immersion: '🌍',
-      pace: '⚡',
-      budget_level: '💰',
-      social_style: '👥'
-    };
+    const specs = [
+      {
+        key: 'physical_demand',
+        title: 'Physical Demand',
+        icon: '💪',
+        labels: ['Very Easy', 'Easy', 'Moderate', 'Challenging', 'Very Challenging'],
+        descriptions: [
+          'Minimal walking, suitable for all ages',
+          'Light walking, mostly flat terrain',
+          'Moderate activity, some hills/stairs',
+          'Active pace, significant walking/hiking',
+          'Strenuous activities, high fitness required'
+        ]
+      },
+      {
+        key: 'cultural_immersion',
+        title: 'Cultural Immersion',
+        icon: '🌍',
+        labels: ['Tourist Path', 'Some Local', 'Balanced', 'Mostly Local', 'Full Immersion'],
+        descriptions: [
+          'Popular tourist attractions and areas',
+          'Mix of tourist sites and local spots',
+          'Equal tourist and authentic experiences',
+          'Mostly local neighborhoods and culture',
+          'Complete cultural immersion, off the beaten path'
+        ]
+      },
+      {
+        key: 'pace',
+        title: 'Trip Pace',
+        icon: '⚡',
+        labels: ['Very Relaxed', 'Relaxed', 'Moderate', 'Fast', 'Packed'],
+        descriptions: [
+          '1-2 activities per day, lots of free time',
+          '2-3 stops daily, leisurely exploration',
+          'Balanced schedule with rest breaks',
+          'Full days with multiple activities',
+          'Dawn to dusk, maximizing every moment'
+        ]
+      },
+      {
+        key: 'budget_level',
+        title: 'Budget Level',
+        icon: '💰',
+        labels: ['Backpacker', 'Budget', 'Mid-Range', 'Upscale', 'Luxury'],
+        descriptions: [
+          'Hostels, street food, public transport',
+          'Budget hotels, local restaurants',
+          'Comfortable hotels, mix of dining',
+          'Quality hotels, nice restaurants',
+          'Premium accommodation and experiences'
+        ]
+      },
+      {
+        key: 'social_style',
+        title: 'Best For',
+        icon: '👥',
+        labels: ['Solo', 'Couples', 'Friends', 'Families', 'Groups'],
+        descriptions: [
+          'Perfect for solo travelers',
+          'Romantic spots for couples',
+          'Fun activities for friend groups',
+          'Family-friendly with all ages',
+          'Large group accommodations and activities'
+        ]
+      }
+    ];
     
     return `
       <div class="trip-characteristics-display">
         <h2>Trip Characteristics</h2>
         <div class="characteristics-grid">
-          ${renderCharacteristic('Physical Demand', icons.physical_demand, 
-            chars.physical_demand, labels.physical_demand)}
-          ${renderCharacteristic('Cultural Immersion', icons.cultural_immersion, 
-            chars.cultural_immersion, labels.cultural_immersion)}
-          ${renderCharacteristic('Pace', icons.pace, 
-            chars.pace, labels.pace)}
-          ${renderCharacteristic('Budget Level', icons.budget_level, 
-            chars.budget_level, labels.budget_level)}
-          ${renderCharacteristic('Best For', icons.social_style, 
-            chars.social_style, labels.social_style)}
+          ${specs.map(spec => {
+            const value = chars[spec.key];
+            if (!value) return '';
+            
+            return renderCharacteristic(
+              spec.title,
+              spec.icon,
+              value,
+              spec.labels,
+              spec.descriptions[value - 1]
+            );
+          }).join('')}
         </div>
       </div>
     `;
   };
 
   /**
-   * Render individual characteristic
+   * Render individual characteristic with description
    */
-  const renderCharacteristic = (title, icon, value, labels) => {
-    if (!value) return '';
-    
+  const renderCharacteristic = (title, icon, value, labels, description) => {
     const dots = Array.from({length: 5}, (_, i) => 
       `<span class="char-dot ${i < value ? 'filled' : ''}"></span>`
     ).join('');
@@ -286,6 +383,7 @@ const TripModal = (() => {
           <div class="char-dots">${dots}</div>
           <span class="char-label">${labels[value - 1]}</span>
         </div>
+        <p class="char-description">${description}</p>
       </div>
     `;
   };
@@ -327,19 +425,19 @@ const TripModal = (() => {
     const days = currentItinerary.days || [];
     if (days.length === 0) return '<p>No days added yet.</p>';
     
-    const previewDays = isPurchased ? null : getPreviewDays();
+    const previewDays = (isPurchased || currentContext === 'preview') ? null : getPreviewDays();
     
     return `
       <div class="trip-days-section">
         <h2>Day by Day Itinerary</h2>
-        ${!isPurchased ? `
+        ${previewDays ? `
           <p class="preview-notice">
             🔓 Showing preview of ${previewDays.length === 1 ? '1 day' : '2 days'} out of ${days.length} total days
           </p>
         ` : ''}
         <div class="days-container">
           ${days.map((day, index) => {
-            const isUnlocked = isPurchased || previewDays.includes(index);
+            const isUnlocked = !previewDays || previewDays.includes(index);
             return renderDay(day, index, isDetailed, isUnlocked);
           }).join('')}
         </div>
@@ -386,7 +484,7 @@ const TripModal = (() => {
             <span class="day-number">Day ${day.day_number}</span>
             <strong>${day.title || `Day ${day.day_number}`}</strong>
             <span class="day-stops-count">${stopCount} stops</span>
-            ${!isPurchased ? '<span class="preview-badge-small">Preview</span>' : ''}
+            ${previewDays && !isPurchased ? '<span class="preview-badge-small">Preview</span>' : ''}
           </div>
           <svg class="day-toggle-icon" width="20" height="20" fill="none">
             <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
@@ -447,47 +545,53 @@ const TripModal = (() => {
   };
 
   /**
-   * Render travel essentials
+   * Render travel essentials - fully visible in preview mode
    */
   const renderEssentials = () => {
     const { transportation, accommodation, travel_tips } = currentItinerary;
     
     if (!transportation && !accommodation && !travel_tips) return '';
     
-    // For unpurchased, show that essentials exist but blur content
-    if (!isPurchased) {
+    // For unpurchased (not preview mode), show that essentials exist but lock content
+    if (!isPurchased && currentContext !== 'preview') {
       return `
         <div class="trip-essentials-section locked">
           <h2>Travel Essentials</h2>
           <div class="essentials-locked">
-            <div class="locked-essential-item">
-              <span class="essential-icon">🚕</span>
-              <div>
-                <strong>Transportation Guide</strong>
-                <p>✓ Getting there instructions</p>
-                <p>✓ Local transport tips</p>
+            ${transportation ? `
+              <div class="locked-essential-item">
+                <span class="essential-icon">🚕</span>
+                <div>
+                  <strong>Transportation Guide</strong>
+                  <p>✓ Getting there instructions</p>
+                  <p>✓ Local transport tips</p>
+                </div>
+                <span class="lock-icon">🔒</span>
               </div>
-              <span class="lock-icon">🔒</span>
-            </div>
-            <div class="locked-essential-item">
-              <span class="essential-icon">🏨</span>
-              <div>
-                <strong>Accommodation Tips</strong>
-                <p>✓ Best areas to stay</p>
-                <p>✓ Booking recommendations</p>
+            ` : ''}
+            ${accommodation ? `
+              <div class="locked-essential-item">
+                <span class="essential-icon">🏨</span>
+                <div>
+                  <strong>Accommodation Tips</strong>
+                  <p>✓ Best areas to stay</p>
+                  <p>✓ Booking recommendations</p>
+                </div>
+                <span class="lock-icon">🔒</span>
               </div>
-              <span class="lock-icon">🔒</span>
-            </div>
-            <div class="locked-essential-item">
-              <span class="essential-icon">💡</span>
-              <div>
-                <strong>Insider Travel Tips</strong>
-                <p>✓ Best time to visit</p>
-                <p>✓ Budget breakdown</p>
-                <p>✓ Packing suggestions</p>
+            ` : ''}
+            ${travel_tips ? `
+              <div class="locked-essential-item">
+                <span class="essential-icon">💡</span>
+                <div>
+                  <strong>Insider Travel Tips</strong>
+                  <p>✓ Best time to visit</p>
+                  <p>✓ Budget breakdown</p>
+                  <p>✓ Packing suggestions</p>
+                </div>
+                <span class="lock-icon">🔒</span>
               </div>
-              <span class="lock-icon">🔒</span>
-            </div>
+            ` : ''}
             <p class="unlock-message">
               Purchase to unlock all travel essentials and insider knowledge
             </p>
@@ -573,12 +677,12 @@ const TripModal = (() => {
   };
 
   /**
-   * Render modal footer with actions
+   * Render modal footer with properly positioned actions
    */
   const renderFooter = () => {
     if (currentContext === 'preview') {
       return `
-        <div class="trip-modal-footer">
+        <div class="trip-modal-footer preview-footer">
           <div class="preview-note">
             <svg width="20" height="20" fill="none">
               <circle cx="10" cy="10" r="9" stroke="currentColor" stroke-width="2"/>
@@ -653,6 +757,21 @@ const TripModal = (() => {
         }
       });
     });
+  };
+
+  /**
+   * Handle purchase action
+   */
+  const handlePurchase = () => {
+    Events.emit('purchase:initiate', { itinerary: currentItinerary });
+  };
+
+  /**
+   * Handle wishlist action
+   */
+  const handleWishlist = async (itineraryId, button) => {
+    // Implementation would go here
+    console.log('Wishlist action for:', itineraryId);
   };
 
   // Public API
