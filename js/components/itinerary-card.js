@@ -173,10 +173,10 @@ const ItineraryCard = (() => {
     if (context === 'preview') {
       return `
         <div class="card-footer-enhanced preview-mode">
-          <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); ItineraryCard.openModal('preview', 'preview')">
+          <button class="btn btn-secondary btn-sm" data-action="preview-modal">
             👁️ Preview Modal
           </button>
-          <button class="btn btn-primary btn-sm" onclick="event.stopPropagation(); Events.emit('create:continue-editing')">
+          <button class="btn btn-primary btn-sm" data-action="back-to-build">
             Continue Editing
           </button>
         </div>
@@ -188,7 +188,7 @@ const ItineraryCard = (() => {
             <span>👁️ ${itinerary.view_count || 0}</span>
             <span>🛒 ${itinerary.total_sales || 0}</span>
           </div>
-          <button class="icon-btn" onclick="event.stopPropagation(); window.location.href='/create?edit=${itinerary.id}'">
+          <button class="icon-btn" data-action="edit-itinerary" data-id="${itinerary.id}">
             ✏️
           </button>
         </div>
@@ -199,13 +199,14 @@ const ItineraryCard = (() => {
         <div class="card-footer-enhanced">
           ${itinerary.creator ? `
             <div class="creator-info-enhanced">
-              <img src="${itinerary.creator.avatar_url || 'https://i.pravatar.cc/32'}" 
+              <img src="${itinerary.creator.avatar_url || '/images/default-avatar.png'}" 
                    alt="${itinerary.creator.username}" 
-                   class="creator-avatar-small">
+                   class="creator-avatar-small"
+                   onerror="this.src='/images/default-avatar.png'">
               <span class="creator-name">${itinerary.creator.username}</span>
             </div>
           ` : ''}
-          <button class="wishlist-btn" onclick="event.stopPropagation(); ItineraryCard.toggleWishlist('${itinerary.id}')">
+          <button class="wishlist-btn" data-action="wishlist" data-id="${itinerary.id}">
             ❤️
           </button>
         </div>
