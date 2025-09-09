@@ -1,12 +1,14 @@
 /**
  * Trip Details Modal Component
- * Displays complete itinerary information in a modal
+ * Displays complete or partial itinerary information based on purchase status
  * Place in: js/components/trip-modal.js
  */
 
 const TripModal = (() => {
   let currentItinerary = null;
   let currentContext = 'view'; // 'preview', 'view', 'edit'
+  let currentUser = null;
+  let isPurchased = false;
 
   /**
    * Initialize the modal component
@@ -35,9 +37,20 @@ const TripModal = (() => {
    * Open the trip modal
    * @param {Object} data - Contains itinerary and context
    */
-  const open = (data) => {
+  const open = async (data) => {
     currentItinerary = data.itinerary;
     currentContext = data.context || 'view';
+    
+    // Get current user to check ownership
+    currentUser = await API.auth.getUser();
+    
+    // Check if user owns this itinerary or has purchased it
+    const isOwner = currentUser && currentItinerary.creator_id === currentUser.id;
+    const isPreviewMode = currentContext === 'preview';
+    
+    // For now, assume not purchased unless it's owner or preview mode
+    // In production, you'd check the purchases table
+    isPurchased = isOwner || isPreviewMode;
     
     let modal = document.getElementById('trip-modal');
     if (!modal) {
@@ -116,6 +129,22 @@ const TripModal = (() => {
   };
 
   /**
+   * Determine which days to show in preview
+   */
+  const getPreviewDays = () => {
+    const totalDays = currentItinerary.duration_days || 0;
+    
+    // For trips 5 days or less, only show day 1
+    if (totalDays <= 5) {
+      return [0]; // Just first day
+    }
+    
+    // For longer trips, show day 1 and a middle day
+    const middleDay = Math.floor(totalDays / 2);
+    return [0, middleDay]; // First day and middle day
+  };
+
+  /**
    * Render the modal content
    */
   const renderContent = () => {
@@ -129,6 +158,7 @@ const TripModal = (() => {
       ${renderHeader()}
       ${renderCharacteristics()}
       ${renderQuickStats(stats)}
+      ${!isPurchased ? renderPurchasePrompt() : ''}
       ${renderDayByDay(isDetailed)}
       ${renderEssentials()}
       ${renderFooter()}
@@ -136,6 +166,26 @@ const TripModal = (() => {
     
     // Set up collapsible day sections
     setupDayToggles();
+  };
+
+  /**
+   * Render purchase prompt for unpurchased itineraries
+   */
+  const renderPurchasePrompt = () => {
+    const previewDays = getPreviewDays();
+    const daysText = previewDays.length === 1 ? 'Day 1' : `Day 1 and Day ${previewDays[1] + 1}`;
+    
+    return `
+      <div class="purchase-prompt-banner">
+        <div class="prompt-content">
+          <h3>🔍 Preview Mode</h3>
+          <p>You're viewing a preview with ${daysText} unlocked. Purchase to access all ${currentItinerary.duration_days} days, insider tips, and travel essentials.</p>
+          <button class="btn btn-primary">
+            Unlock Full Itinerary - €${currentItinerary.price_tier}
+          </button>
+        </div>
+      </div>
+    `;
   };
 
   /**
@@ -167,7 +217,8 @@ const TripModal = (() => {
         </div>
         
         ${currentContext === 'preview' ? 
-          '<div class="preview-badge">Preview Mode</div>' : ''
+          '<div class="preview-badge">Creator Preview</div>' : 
+          (!isPurchased ? '<div class="preview-badge">Preview Mode</div>' : '')
         }
       </div>
     `;
@@ -253,7 +304,7 @@ const TripModal = (() => {
           <span class="stat-value">${stats.avgStopsPerDay}</span>
           <span class="stat-label">Stops/Day</span>
         </div>
-        ${stats.totalCost > 0 ? `
+        ${isPurchased && stats.totalCost > 0 ? `
           <div class="stat-item">
             <span class="stat-value">€${(stats.totalCost / 100).toFixed(0)}</span>
             <span class="stat-label">Est. Cost</span>
@@ -276,11 +327,21 @@ const TripModal = (() => {
     const days = currentItinerary.days || [];
     if (days.length === 0) return '<p>No days added yet.</p>';
     
+    const previewDays = isPurchased ? null : getPreviewDays();
+    
     return `
       <div class="trip-days-section">
         <h2>Day by Day Itinerary</h2>
+        ${!isPurchased ? `
+          <p class="preview-notice">
+            🔓 Showing preview of ${previewDays.length === 1 ? '1 day' : '2 days'} out of ${days.length} total days
+          </p>
+        ` : ''}
         <div class="days-container">
-          ${days.map((day, index) => renderDay(day, index, isDetailed)).join('')}
+          ${days.map((day, index) => {
+            const isUnlocked = isPurchased || previewDays.includes(index);
+            return renderDay(day, index, isDetailed, isUnlocked);
+          }).join('')}
         </div>
       </div>
     `;
@@ -289,16 +350,43 @@ const TripModal = (() => {
   /**
    * Render individual day
    */
-  const renderDay = (day, index, isDetailed) => {
+  const renderDay = (day, index, isDetailed, isUnlocked) => {
     const stopCount = day.stops?.length || 0;
     
+    if (!isUnlocked) {
+      // Locked day - show minimal info
+      return `
+        <div class="trip-day-item locked">
+          <div class="day-header locked-header">
+            <div class="day-title">
+              <span class="day-number">Day ${day.day_number}</span>
+              <strong>${day.title || `Day ${day.day_number}`}</strong>
+              <span class="day-stops-count">${stopCount} stops</span>
+            </div>
+            <svg class="lock-icon" width="20" height="20" fill="none">
+              <rect x="5" y="9" width="10" height="8" rx="1" stroke="currentColor" stroke-width="2"/>
+              <path d="M7 9V6a3 3 0 016 0v3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+          </div>
+          <div class="day-content locked-content">
+            <p class="locked-message">
+              🔒 This day includes ${stopCount} carefully selected stops. 
+              Purchase to unlock detailed information, tips, and insider knowledge.
+            </p>
+          </div>
+        </div>
+      `;
+    }
+    
+    // Unlocked day - show full content
     return `
-      <div class="trip-day-item">
+      <div class="trip-day-item ${isUnlocked ? 'unlocked' : ''}">
         <div class="day-header" data-day-index="${index}">
           <div class="day-title">
             <span class="day-number">Day ${day.day_number}</span>
             <strong>${day.title || `Day ${day.day_number}`}</strong>
             <span class="day-stops-count">${stopCount} stops</span>
+            ${!isPurchased ? '<span class="preview-badge-small">Preview</span>' : ''}
           </div>
           <svg class="day-toggle-icon" width="20" height="20" fill="none">
             <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
@@ -366,6 +454,49 @@ const TripModal = (() => {
     
     if (!transportation && !accommodation && !travel_tips) return '';
     
+    // For unpurchased, show that essentials exist but blur content
+    if (!isPurchased) {
+      return `
+        <div class="trip-essentials-section locked">
+          <h2>Travel Essentials</h2>
+          <div class="essentials-locked">
+            <div class="locked-essential-item">
+              <span class="essential-icon">🚕</span>
+              <div>
+                <strong>Transportation Guide</strong>
+                <p>✓ Getting there instructions</p>
+                <p>✓ Local transport tips</p>
+              </div>
+              <span class="lock-icon">🔒</span>
+            </div>
+            <div class="locked-essential-item">
+              <span class="essential-icon">🏨</span>
+              <div>
+                <strong>Accommodation Tips</strong>
+                <p>✓ Best areas to stay</p>
+                <p>✓ Booking recommendations</p>
+              </div>
+              <span class="lock-icon">🔒</span>
+            </div>
+            <div class="locked-essential-item">
+              <span class="essential-icon">💡</span>
+              <div>
+                <strong>Insider Travel Tips</strong>
+                <p>✓ Best time to visit</p>
+                <p>✓ Budget breakdown</p>
+                <p>✓ Packing suggestions</p>
+              </div>
+              <span class="lock-icon">🔒</span>
+            </div>
+            <p class="unlock-message">
+              Purchase to unlock all travel essentials and insider knowledge
+            </p>
+          </div>
+        </div>
+      `;
+    }
+    
+    // Full content for purchased/preview
     return `
       <div class="trip-essentials-section">
         <h2>Travel Essentials</h2>
@@ -448,12 +579,23 @@ const TripModal = (() => {
     if (currentContext === 'preview') {
       return `
         <div class="trip-modal-footer">
-          <button class="btn btn-secondary" onclick="TripModal.close()">
-            Close Preview
-          </button>
-          <button class="btn btn-primary" data-action="back-to-build">
-            Continue Editing
-          </button>
+          <div class="preview-note">
+            <svg width="20" height="20" fill="none">
+              <circle cx="10" cy="10" r="9" stroke="currentColor" stroke-width="2"/>
+              <path d="M10 6v4M10 14h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+            <p>This is how buyers will see your itinerary. They'll have access to ${
+              currentItinerary.duration_days <= 5 ? 'Day 1 only' : 'Day 1 and Day ' + (Math.floor(currentItinerary.duration_days / 2) + 1)
+            } as a preview.</p>
+          </div>
+          <div class="footer-actions">
+            <button class="btn btn-secondary" onclick="TripModal.close()">
+              Close Preview
+            </button>
+            <button class="btn btn-primary" data-action="back-to-build">
+              Continue Editing
+            </button>
+          </div>
         </div>
       `;
     } else if (currentContext === 'view') {
@@ -472,13 +614,19 @@ const TripModal = (() => {
             ` : ''}
           </div>
           <div class="action-buttons">
-            <button class="btn btn-secondary" data-action="wishlist" 
-                    data-id="${currentItinerary.id}">
-              Save to Wishlist
-            </button>
-            <button class="btn btn-primary btn-purchase">
-              Purchase €${currentItinerary.price_tier}
-            </button>
+            ${!isPurchased ? `
+              <button class="btn btn-secondary" data-action="wishlist" 
+                      data-id="${currentItinerary.id}">
+                Save to Wishlist
+              </button>
+              <button class="btn btn-primary btn-purchase">
+                Purchase €${currentItinerary.price_tier}
+              </button>
+            ` : `
+              <button class="btn btn-secondary" onclick="TripModal.close()">
+                Close
+              </button>
+            `}
           </div>
         </div>
       `;
@@ -491,17 +639,17 @@ const TripModal = (() => {
    * Set up day toggle functionality
    */
   const setupDayToggles = () => {
-    document.querySelectorAll('.day-header').forEach(header => {
+    document.querySelectorAll('.day-header:not(.locked-header)').forEach(header => {
       header.addEventListener('click', () => {
         const content = header.nextElementSibling;
         const icon = header.querySelector('.day-toggle-icon');
         
         if (content.style.display === 'none' || !content.style.display) {
           content.style.display = 'block';
-          icon.style.transform = 'rotate(180deg)';
+          if (icon) icon.style.transform = 'rotate(180deg)';
         } else {
           content.style.display = 'none';
-          icon.style.transform = 'rotate(0)';
+          if (icon) icon.style.transform = 'rotate(0)';
         }
       });
     });

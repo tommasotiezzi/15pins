@@ -1,6 +1,6 @@
 /**
  * Itinerary Card Component
- * Reusable card for displaying itinerary summaries
+ * Reusable card for displaying itinerary summaries with full transparency
  * Place in: js/components/itinerary-card.js
  */
 
@@ -13,7 +13,6 @@ const ItineraryCard = (() => {
    */
   const create = (itinerary, context = 'feed') => {
     const stats = calculateStats(itinerary);
-    const characteristics = getCharacteristicBadges(itinerary.characteristics);
     const isWishlisted = checkWishlistStatus(itinerary.id);
     
     return `
@@ -25,7 +24,7 @@ const ItineraryCard = (() => {
         
         <div class="card-content-enhanced">
           ${renderCardHeader(itinerary)}
-          ${renderCharacteristicBadges(characteristics)}
+          ${renderFullCharacteristics(itinerary.characteristics)}
           ${renderCardStats(stats, itinerary)}
           ${renderCardFooter(itinerary, context, isWishlisted)}
         </div>
@@ -34,15 +33,25 @@ const ItineraryCard = (() => {
   };
 
   /**
-   * Calculate statistics for the itinerary
+   * Calculate comprehensive statistics for the itinerary
    */
   const calculateStats = (itinerary) => {
     let totalStops = 0;
+    let totalCost = 0;
+    let stopTypes = new Set();
     
     if (itinerary.days) {
       itinerary.days.forEach(day => {
         if (day.stops) {
           totalStops += day.stops.length;
+          day.stops.forEach(stop => {
+            if (stop.cost_cents) {
+              totalCost += stop.cost_cents;
+            }
+            if (stop.type) {
+              stopTypes.add(stop.type);
+            }
+          });
         }
       });
     }
@@ -50,51 +59,12 @@ const ItineraryCard = (() => {
     return {
       totalStops,
       avgStopsPerDay: itinerary.duration_days ? 
-        Math.round(totalStops / itinerary.duration_days) : 0
+        Math.round(totalStops / itinerary.duration_days) : 0,
+      totalCost,
+      hasAccommodation: stopTypes.has('accommodation'),
+      hasTransport: stopTypes.has('transport'),
+      uniqueStopTypes: stopTypes.size
     };
-  };
-
-  /**
-   * Get characteristic badges to display
-   */
-  const getCharacteristicBadges = (characteristics) => {
-    if (!characteristics) return [];
-    
-    const badges = [];
-    const labels = {
-      physical_demand: ['Very Easy', 'Easy', 'Moderate', 'Active', 'Challenging'],
-      pace: ['Relaxed', 'Easy', 'Moderate', 'Fast', 'Packed'],
-      budget_level: ['Budget', 'Economy', 'Mid-Range', 'Upscale', 'Luxury']
-    };
-    
-    // Physical demand badge
-    if (characteristics.physical_demand) {
-      badges.push({
-        type: 'physical',
-        label: labels.physical_demand[characteristics.physical_demand - 1],
-        value: characteristics.physical_demand
-      });
-    }
-    
-    // Pace badge
-    if (characteristics.pace) {
-      badges.push({
-        type: 'pace',
-        label: labels.pace[characteristics.pace - 1],
-        value: characteristics.pace
-      });
-    }
-    
-    // Budget badge
-    if (characteristics.budget_level) {
-      badges.push({
-        type: 'budget',
-        label: labels.budget_level[characteristics.budget_level - 1],
-        value: characteristics.budget_level
-      });
-    }
-    
-    return badges;
   };
 
   /**
@@ -106,9 +76,12 @@ const ItineraryCard = (() => {
   };
 
   /**
-   * Render card image section
+   * Render card image section with price tier indicator
    */
   const renderCardImage = (itinerary) => {
+    const tierLabel = itinerary.price_tier === 19 ? 'DETAILED' : 'ESSENTIAL';
+    const tierClass = itinerary.price_tier === 19 ? 'detailed' : 'basic';
+    
     return `
       <div class="card-image-enhanced" 
            onclick="ItineraryCard.handleCardClick('${itinerary.id}', '${itinerary.context || 'feed'}')">
@@ -124,15 +97,18 @@ const ItineraryCard = (() => {
           </div>`
         }
         <div class="card-badges-overlay">
-          <span class="card-badge-duration">${itinerary.duration_days} days</span>
-          <span class="card-badge-price">€${itinerary.price_tier}</span>
+          <span class="card-badge-duration">📅 ${itinerary.duration_days} days</span>
+          <span class="card-badge-price tier-${tierClass}">
+            €${itinerary.price_tier}
+            <span class="tier-label">${tierLabel}</span>
+          </span>
         </div>
       </div>
     `;
   };
 
   /**
-   * Render card header
+   * Render card header with title and location
    */
   const renderCardHeader = (itinerary) => {
     return `
@@ -142,54 +118,109 @@ const ItineraryCard = (() => {
           ${itinerary.title || 'Untitled Itinerary'}
         </h3>
         <div class="card-location-enhanced">
-          <svg width="16" height="16" fill="none">
-            <path d="M8 8.5C9.1 8.5 10 7.6 10 6.5C10 5.4 9.1 4.5 8 4.5C6.9 4.5 6 5.4 6 6.5C6 7.6 6.9 8.5 8 8.5Z" 
-                  stroke="currentColor"/>
-            <path d="M8 1C5 1 2.5 3.5 2.5 6.5C2.5 10.5 8 15 8 15C8 15 13.5 10.5 13.5 6.5C13.5 3.5 11 1 8 1Z" 
-                  stroke="currentColor"/>
+          <svg width="14" height="14" fill="none">
+            <path d="M7 1C4 1 2 3 2 6C2 9 7 13 7 13C7 13 12 9 12 6C12 3 10 1 7 1Z" 
+                  stroke="currentColor" stroke-width="1.5"/>
           </svg>
-          ${itinerary.destination || 'Unknown'}
+          <span>${itinerary.destination || 'Unknown'}</span>
         </div>
       </div>
     `;
   };
 
   /**
-   * Render characteristic badges
+   * Render all 5 characteristics with visual indicators
    */
-  const renderCharacteristicBadges = (badges) => {
-    if (!badges || badges.length === 0) return '';
+  const renderFullCharacteristics = (characteristics) => {
+    if (!characteristics) return '';
+    
+    const specs = [
+      {
+        key: 'physical_demand',
+        icon: '💪',
+        labels: ['Very Easy', 'Easy', 'Moderate', 'Active', 'Challenging'],
+        shortLabels: ['V.Easy', 'Easy', 'Moderate', 'Active', 'Hard']
+      },
+      {
+        key: 'cultural_immersion',
+        icon: '🌍',
+        labels: ['Tourist Path', 'Some Local', 'Balanced', 'Mostly Local', 'Full Immersion'],
+        shortLabels: ['Tourist', 'Mixed', 'Balanced', 'Local', 'Immersive']
+      },
+      {
+        key: 'pace',
+        icon: '⚡',
+        labels: ['Very Relaxed', 'Relaxed', 'Moderate', 'Fast', 'Packed'],
+        shortLabels: ['V.Slow', 'Relaxed', 'Moderate', 'Fast', 'Packed']
+      },
+      {
+        key: 'budget_level',
+        icon: '💰',
+        labels: ['Backpacker', 'Budget', 'Mid-Range', 'Upscale', 'Luxury'],
+        shortLabels: ['Backpack', 'Budget', 'Mid', 'Upscale', 'Luxury']
+      },
+      {
+        key: 'social_style',
+        icon: '👥',
+        labels: ['Solo', 'Couples', 'Friends', 'Families', 'Groups'],
+        shortLabels: ['Solo', 'Couples', 'Friends', 'Family', 'Groups']
+      }
+    ];
     
     return `
-      <div class="card-characteristics">
-        ${badges.map(badge => `
-          <span class="char-badge char-badge-${badge.type}" 
-                data-value="${badge.value}">
-            ${badge.label}
-          </span>
-        `).join('')}
+      <div class="card-characteristics-full">
+        ${specs.map(spec => {
+          const value = characteristics[spec.key];
+          if (!value) return '';
+          
+          return `
+            <div class="char-item" title="${spec.labels[value - 1]}">
+              <span class="char-icon">${spec.icon}</span>
+              <span class="char-label">${spec.shortLabels[value - 1]}</span>
+              <div class="char-dots">
+                ${Array.from({length: 5}, (_, i) => 
+                  `<span class="dot ${i < value ? 'filled' : ''}"></span>`
+                ).join('')}
+              </div>
+            </div>
+          `;
+        }).join('')}
       </div>
     `;
   };
 
   /**
-   * Render card statistics
+   * Render comprehensive card statistics
    */
   const renderCardStats = (stats, itinerary) => {
+    const includesLabels = [];
+    if (stats.hasAccommodation) includesLabels.push('🏨 Stay');
+    if (stats.hasTransport) includesLabels.push('🚌 Transport');
+    
     return `
       <div class="card-stats-enhanced">
-        <div class="stat-item">
-          <span class="stat-icon">📍</span>
-          <span class="stat-text">${stats.totalStops} stops</span>
-        </div>
-        <div class="stat-item">
-          <span class="stat-icon">⏱️</span>
-          <span class="stat-text">${stats.avgStopsPerDay}/day</span>
-        </div>
-        ${itinerary.total_sales ? `
+        <div class="primary-stats">
           <div class="stat-item">
-            <span class="stat-icon">⭐</span>
-            <span class="stat-text">${itinerary.total_sales} sold</span>
+            <span class="stat-icon">📍</span>
+            <span class="stat-value">${stats.totalStops}</span>
+            <span class="stat-label">stops</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-icon">⏱️</span>
+            <span class="stat-value">${stats.avgStopsPerDay}</span>
+            <span class="stat-label">per day</span>
+          </div>
+          ${itinerary.total_sales ? `
+            <div class="stat-item highlight">
+              <span class="stat-icon">⭐</span>
+              <span class="stat-value">${itinerary.total_sales}</span>
+              <span class="stat-label">sold</span>
+            </div>
+          ` : ''}
+        </div>
+        ${includesLabels.length > 0 ? `
+          <div class="includes-labels">
+            ${includesLabels.map(label => `<span class="include-tag">${label}</span>`).join('')}
           </div>
         ` : ''}
       </div>
@@ -197,33 +228,60 @@ const ItineraryCard = (() => {
   };
 
   /**
-   * Render card footer
+   * Render card footer with creator info and actions
    */
   const renderCardFooter = (itinerary, context, isWishlisted) => {
     if (context === 'preview') {
       return `
-        <div class="card-footer-enhanced">
-          <button class="btn btn-secondary btn-sm" 
-                  onclick="ItineraryCard.handleCardClick('${itinerary.id}', 'preview')">
+        <div class="card-footer-enhanced preview-mode">
+          <div class="preview-notice">
             <svg width="16" height="16" fill="none">
-              <path d="M1 8C1 8 3.5 2 8 2C12.5 2 15 8 15 8C15 8 12.5 14 8 14C3.5 14 1 8 1 8Z" 
-                    stroke="currentColor" stroke-width="1.5"/>
-              <circle cx="8" cy="8" r="2" stroke="currentColor" stroke-width="1.5"/>
+              <path d="M8 4v4m0 4h.01M14 8A6 6 0 112 8a6 6 0 0112 0z" 
+                    stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
             </svg>
-            Full Preview
-          </button>
-          <button class="btn btn-primary btn-sm" 
-                  data-action="back-to-build">
-            Continue Editing
-          </button>
+            <span>Preview Mode</span>
+          </div>
+          <div class="preview-actions">
+            <button class="btn btn-secondary btn-sm" 
+                    onclick="ItineraryCard.handleCardClick('${itinerary.id}', 'preview')">
+              <svg width="16" height="16" fill="none">
+                <path d="M1 8C1 8 3.5 2 8 2C12.5 2 15 8 15 8C15 8 12.5 14 8 14C3.5 14 1 8 1 8Z" 
+                      stroke="currentColor" stroke-width="1.5"/>
+                <circle cx="8" cy="8" r="2" stroke="currentColor" stroke-width="1.5"/>
+              </svg>
+              Preview
+            </button>
+            <button class="btn btn-primary btn-sm" 
+                    data-action="back-to-build">
+              Continue
+            </button>
+          </div>
         </div>
       `;
     } else if (context === 'dashboard') {
       return `
-        <div class="card-footer-enhanced">
+        <div class="card-footer-enhanced dashboard-mode">
           <div class="creator-stats">
-            <span>${itinerary.view_count || 0} views</span>
-            <span>${itinerary.total_sales || 0} sales</span>
+            <span class="stat-mini">
+              <svg width="14" height="14" fill="none">
+                <path d="M1 7C1 7 3 2 7 2C11 2 13 7 13 7C13 7 11 12 7 12C3 12 1 7 1 7Z" 
+                      stroke="currentColor"/>
+                <circle cx="7" cy="7" r="2" stroke="currentColor"/>
+              </svg>
+              ${itinerary.view_count || 0}
+            </span>
+            <span class="stat-mini">
+              <svg width="14" height="14" fill="none">
+                <path d="M3 13h8l-1-9H4l-1 9zM7 2v2M5 4h4" 
+                      stroke="currentColor" stroke-linecap="round"/>
+              </svg>
+              ${itinerary.total_sales || 0}
+            </span>
+            ${itinerary.revenue_cents ? `
+              <span class="stat-mini revenue">
+                €${(itinerary.revenue_cents / 100).toFixed(0)}
+              </span>
+            ` : ''}
           </div>
           <div class="card-actions">
             <button class="icon-btn" data-action="edit-itinerary" 
@@ -234,7 +292,7 @@ const ItineraryCard = (() => {
               </svg>
             </button>
             <button class="icon-btn" data-action="view-stats" 
-                    data-id="${itinerary.id}" aria-label="Stats">
+                    data-id="${itinerary.id}" aria-label="Analytics">
               <svg width="16" height="16" fill="none">
                 <path d="M2 14V7M8 14V2M14 14V9" 
                       stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
@@ -253,15 +311,20 @@ const ItineraryCard = (() => {
                    alt="${itinerary.creator.username}" 
                    class="creator-avatar-small"
                    loading="lazy">
-              <span class="creator-name">${itinerary.creator.username}</span>
+              <div class="creator-details">
+                <span class="creator-name">${itinerary.creator.username}</span>
+                ${itinerary.creator.trip_count ? `
+                  <span class="creator-meta">${itinerary.creator.trip_count} trips</span>
+                ` : ''}
+              </div>
             ` : ''}
           </div>
           <button class="wishlist-btn-enhanced ${isWishlisted ? 'active' : ''}" 
                   data-action="wishlist" 
                   data-id="${itinerary.id}"
                   aria-label="${isWishlisted ? 'Remove from' : 'Add to'} wishlist">
-            <svg width="18" height="18" fill="${isWishlisted ? 'currentColor' : 'none'}">
-              <path d="M9 16L2 9C0 7 1 3 4 4L9 9L14 4C17 3 18 7 16 9L9 16Z" 
+            <svg width="20" height="20" fill="${isWishlisted ? 'currentColor' : 'none'}">
+              <path d="M10 17L3 10C1 8 2 4 5 5L10 10L15 5C18 4 19 8 17 10L10 17Z" 
                     stroke="currentColor" stroke-width="1.5"/>
             </svg>
           </button>
@@ -271,7 +334,7 @@ const ItineraryCard = (() => {
   };
 
   /**
-   * Handle card click
+   * Handle card click event
    */
   const handleCardClick = (itineraryId, context) => {
     event.stopPropagation(); // Prevent event bubbling
@@ -296,6 +359,12 @@ const ItineraryCard = (() => {
    */
   const fetchAndOpenModal = async (itineraryId, context) => {
     try {
+      // Show loading state on card
+      const card = document.querySelector(`[data-itinerary-id="${itineraryId}"]`);
+      if (card) {
+        card.classList.add('loading');
+      }
+      
       const { data: itinerary, error } = await API.itineraries.get(itineraryId);
       
       if (error || !itinerary) {
@@ -310,6 +379,46 @@ const ItineraryCard = (() => {
     } catch (err) {
       console.error('Error loading itinerary:', err);
       Toast.error('Failed to load itinerary');
+    } finally {
+      // Remove loading state
+      const card = document.querySelector(`[data-itinerary-id="${itineraryId}"]`);
+      if (card) {
+        card.classList.remove('loading');
+      }
+    }
+  };
+
+  /**
+   * Handle wishlist toggle
+   */
+  const handleWishlistToggle = async (itineraryId, button) => {
+    const isActive = button.classList.contains('active');
+    
+    try {
+      if (isActive) {
+        await API.wishlists.remove(itineraryId);
+        button.classList.remove('active');
+        const svg = button.querySelector('svg');
+        if (svg) svg.setAttribute('fill', 'none');
+        Toast.success('Removed from wishlist');
+      } else {
+        await API.wishlists.add(itineraryId);
+        button.classList.add('active');
+        const svg = button.querySelector('svg');
+        if (svg) svg.setAttribute('fill', 'currentColor');
+        Toast.success('Added to wishlist');
+      }
+      
+      // Update local state
+      const wishlist = State.get('wishlist') || [];
+      if (isActive) {
+        State.set('wishlist', wishlist.filter(id => id !== itineraryId));
+      } else {
+        State.set('wishlist', [...wishlist, itineraryId]);
+      }
+    } catch (error) {
+      console.error('Wishlist error:', error);
+      Toast.error('Failed to update wishlist');
     }
   };
 
@@ -323,6 +432,7 @@ const ItineraryCard = (() => {
           <svg width="48" height="48" fill="none" opacity="0.3">
             <path d="M24 12C18 12 13 17 13 23C13 29 24 40 24 40C24 40 35 29 35 23C35 17 30 12 24 12Z" 
                   stroke="currentColor" stroke-width="2"/>
+            <circle cx="24" cy="23" r="3" stroke="currentColor" stroke-width="2"/>
           </svg>
           <h3>No itineraries found</h3>
           <p>Check back later for new travel inspiration!</p>
@@ -330,14 +440,50 @@ const ItineraryCard = (() => {
       `;
     }
     
-    return itineraries.map(it => create(it, context)).join('');
+    return `
+      <div class="itinerary-cards-grid">
+        ${itineraries.map(it => create(it, context)).join('')}
+      </div>
+    `;
   };
 
   /**
    * Initialize card interactions
    */
   const init = () => {
-    // This can be called to set up any global card listeners if needed
+    // Set up delegated event listeners
+    document.addEventListener('click', (e) => {
+      // Handle wishlist button clicks
+      if (e.target.closest('[data-action="wishlist"]')) {
+        const button = e.target.closest('[data-action="wishlist"]');
+        const itineraryId = button.dataset.id;
+        handleWishlistToggle(itineraryId, button);
+        e.stopPropagation();
+      }
+      
+      // Handle back to build button
+      if (e.target.closest('[data-action="back-to-build"]')) {
+        Events.emit('create:continue-editing');
+        e.stopPropagation();
+      }
+      
+      // Handle edit button
+      if (e.target.closest('[data-action="edit-itinerary"]')) {
+        const button = e.target.closest('[data-action="edit-itinerary"]');
+        const itineraryId = button.dataset.id;
+        window.location.href = `/create?edit=${itineraryId}`;
+        e.stopPropagation();
+      }
+      
+      // Handle stats button
+      if (e.target.closest('[data-action="view-stats"]')) {
+        const button = e.target.closest('[data-action="view-stats"]');
+        const itineraryId = button.dataset.id;
+        Events.emit('analytics:open', { itineraryId });
+        e.stopPropagation();
+      }
+    });
+    
     console.log('ItineraryCard component initialized');
   };
 
@@ -349,6 +495,9 @@ const ItineraryCard = (() => {
     init
   };
 })();
+
+// Initialize when DOM is ready
+document.addEventListener('DOMContentLoaded', ItineraryCard.init);
 
 // Make available globally
 window.ItineraryCard = ItineraryCard;

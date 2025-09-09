@@ -15,6 +15,7 @@ const CreateStep4 = (() => {
     
     // Navigation
     Events.on('action:back-to-build', handleBackToBuild);
+    Events.on('create:continue-editing', handleBackToBuild);
   };
 
   // ============= RENDER STEP (ASYNC) =============
@@ -69,15 +70,28 @@ const CreateStep4 = (() => {
           <div class="preview-column">
             <div class="preview-header">
               <h2>📱 Marketplace Preview</h2>
-              <p>This is how buyers will see your itinerary</p>
+              <p>This is exactly how buyers will see your itinerary card</p>
             </div>
             
             <div class="preview-card-wrapper">
               ${renderMarketplaceCard(draft, currentUser)}
             </div>
             
-            <div class="preview-tip">
-              💡 <strong>Tip:</strong> Click the card to see the full modal view that buyers will experience
+            <div class="preview-tips-grid">
+              <div class="preview-tip-card">
+                <span class="tip-icon">👁️</span>
+                <div>
+                  <strong>Full Transparency</strong>
+                  <p>All 5 trip characteristics are visible so buyers know exactly what type of trip this is</p>
+                </div>
+              </div>
+              <div class="preview-tip-card">
+                <span class="tip-icon">🔓</span>
+                <div>
+                  <strong>Preview Access</strong>
+                  <p>Buyers can preview ${draft.duration_days <= 5 ? 'Day 1' : 'Day 1 and Day ' + (Math.floor(draft.duration_days / 2) + 1)} before purchasing</p>
+                </div>
+              </div>
             </div>
           </div>
           
@@ -178,7 +192,7 @@ const CreateStep4 = (() => {
         </div>
       </div>
       
-      <!-- Add CSS for checklist colors -->
+      <!-- Add CSS for enhanced preview -->
       <style>
         .publish-checklist.checklist-red {
           background: #ffebee !important;
@@ -196,24 +210,45 @@ const CreateStep4 = (() => {
         }
         
         .preview-card-wrapper {
-          cursor: pointer;
+          margin-bottom: 20px;
         }
         
-        .itinerary-card-fallback {
-          cursor: pointer;
-          transition: transform 0.2s;
+        .preview-tips-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 12px;
+          margin-top: 16px;
         }
         
-        .itinerary-card-fallback:hover {
-          transform: translateY(-4px);
+        .preview-tip-card {
+          display: flex;
+          gap: 12px;
+          padding: 12px;
+          background: #f8f9fa;
+          border-radius: 8px;
+          border: 1px solid #e0e0e0;
+        }
+        
+        .tip-icon {
+          font-size: 24px;
+          flex-shrink: 0;
+        }
+        
+        .preview-tip-card p {
+          margin: 4px 0 0;
+          font-size: 12px;
+          color: #666;
+          line-height: 1.4;
+        }
+        
+        .preview-tip-card strong {
+          font-size: 13px;
+          color: #333;
         }
       </style>
     `;
     
-    // Initialize card click handler for preview
-    setupCardPreview(draft, currentUser);
-    
-    // Initialize manual checkbox handlers
+    // Setup handlers after DOM is ready
     setupChecklistHandlers();
   };
 
@@ -257,6 +292,16 @@ const CreateStep4 = (() => {
 
   // ============= RENDER MARKETPLACE CARD =============
   const renderMarketplaceCard = (draft, currentUser) => {
+    // Calculate stats for the card
+    let totalStops = 0;
+    if (draft.days) {
+      draft.days.forEach(day => {
+        if (day.stops) {
+          totalStops += day.stops.length;
+        }
+      });
+    }
+    
     // Transform draft to match itinerary structure for the card
     const itineraryPreview = {
       id: 'preview',
@@ -276,10 +321,15 @@ const CreateStep4 = (() => {
       creator: {
         username: currentUser?.username || currentUser?.profile?.username || 'You',
         avatar_url: currentUser?.avatar_url || currentUser?.profile?.avatar_url || 'https://i.pravatar.cc/32',
-        bio: currentUser?.bio || currentUser?.profile?.bio || ''
+        bio: currentUser?.bio || currentUser?.profile?.bio || '',
+        trip_count: 1  // First trip
       },
       context: 'preview'
     };
+    
+    // Store for modal access
+    window.CreatePage = window.CreatePage || {};
+    window.CreatePage.getCurrentDraft = () => itineraryPreview;
     
     // Use ItineraryCard component if available
     if (typeof ItineraryCard !== 'undefined') {
@@ -321,79 +371,6 @@ const CreateStep4 = (() => {
         </div>
       </div>
     `;
-  };
-
-  // ============= SETUP CARD PREVIEW =============
-  const setupCardPreview = (draft, currentUser) => {
-    // Add a small delay to ensure DOM is ready
-    setTimeout(() => {
-      const cardWrapper = document.querySelector('.preview-card-wrapper');
-      if (cardWrapper) {
-        cardWrapper.addEventListener('click', (e) => {
-          // Don't trigger on certain button clicks
-          if (e.target.closest('[data-action="back-to-build"]')) return;
-          if (e.target.closest('[data-action="wishlist"]')) return;
-          
-          const isCard = e.target.closest('.itinerary-card, .itinerary-card-fallback');
-          const isPreviewBtn = e.target.closest('.btn-secondary') || e.target.textContent.includes('Preview');
-          
-          if (isCard || isPreviewBtn) {
-            e.preventDefault();
-            e.stopPropagation();
-            openPreviewModal(draft, currentUser);
-          }
-        });
-      }
-    }, 100);
-  };
-
-  // ============= OPEN PREVIEW MODAL =============
-  const openPreviewModal = (draft, currentUser) => {
-    if (!draft) {
-      console.error('No draft data for preview');
-      return;
-    }
-    
-    // Transform draft for modal
-    const itineraryForModal = {
-      id: 'preview',
-      title: draft.title || 'Untitled Itinerary',
-      destination: draft.destination || 'Unknown',
-      duration_days: draft.duration_days || 0,
-      description: draft.description || '',
-      price_tier: draft.price_tier || 9,
-      cover_image_url: draft.cover_image_url || '',
-      days: draft.days || [],
-      characteristics: draft.characteristics || {},
-      transportation: draft.transportation || null,
-      accommodation: draft.accommodation || null,
-      travel_tips: draft.travel_tips || null,
-      total_sales: 0,
-      view_count: 0,
-      creator: {
-        username: currentUser?.username || currentUser?.profile?.username || 'You',
-        avatar_url: currentUser?.avatar_url || currentUser?.profile?.avatar_url || 'https://i.pravatar.cc/32',
-        bio: currentUser?.bio || currentUser?.profile?.bio || ''
-      }
-    };
-    
-    console.log('Opening modal with draft data:', itineraryForModal);
-    
-    // The TripModal.open expects a data object with itinerary and context
-    const modalData = {
-      itinerary: itineraryForModal,
-      context: 'preview'
-    };
-    
-    // Call TripModal.open directly with the correct data structure
-    if (typeof TripModal !== 'undefined' && TripModal.open) {
-      console.log('Calling TripModal.open directly');
-      TripModal.open(modalData);
-    } else {
-      console.error('TripModal not found, trying Events system');
-      // Fallback to Events system
-      Events.emit('trip-modal:open', modalData);
-    }
   };
 
   // ============= NAVIGATION =============
