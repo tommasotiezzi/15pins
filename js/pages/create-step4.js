@@ -6,6 +6,7 @@
 const CreateStep4 = (() => {
   
   let currentDraftData = null; // Cache for current render
+  let currentCardData = null; // Cache for card data
   
   // ============= INITIALIZATION =============
   const init = () => {
@@ -27,21 +28,32 @@ const CreateStep4 = (() => {
     }
     
     try {
-      // Fetch complete draft data from database
-      const { data: draft, error } = await API.drafts.getPreview(draftId);
+      // TWO SEPARATE API CALLS
+      // 1. Get card data for the preview
+      const { data: cardData, error: cardError } = await API.drafts.getCardData(draftId);
       
-      if (error || !draft) {
-        Toast.error('Failed to load draft for preview');
+      if (cardError || !cardData) {
+        Toast.error('Failed to load card preview');
         return;
       }
       
-      // Store for later use
-      currentDraftData = draft;
+      // 2. Get full draft data for publishing and modal
+      const { data: fullDraft, error: fullError } = await API.drafts.getFullDraft(draftId);
+      
+      if (fullError || !fullDraft) {
+        Toast.error('Failed to load draft details');
+        return;
+      }
+      
+      // Store both for later use
+      currentCardData = cardData;
+      currentDraftData = fullDraft;
       
       // Get current user
       const currentUser = await API.auth.getUser();
       
-      renderPreview(draft, currentUser);
+      // Render with card data
+      renderPreview(cardData, fullDraft, currentUser);
       
     } catch (error) {
       console.error('Error rendering Step 4:', error);
@@ -57,7 +69,7 @@ const CreateStep4 = (() => {
   };
 
   // ============= RENDER PREVIEW =============
-  const renderPreview = (draft, currentUser) => {
+  const renderPreview = (cardData, fullDraft, currentUser) => {
     const container = document.getElementById('step-4');
     if (!container) return;
     
@@ -74,7 +86,7 @@ const CreateStep4 = (() => {
             </div>
             
             <div class="preview-card-wrapper">
-              ${renderMarketplaceCard(draft, currentUser)}
+              ${renderMarketplaceCard(cardData, fullDraft, currentUser)}
             </div>
             
             <div class="preview-tips-grid">
@@ -89,7 +101,7 @@ const CreateStep4 = (() => {
                 <span class="tip-icon">🔓</span>
                 <div>
                   <strong>Preview Access</strong>
-                  <p>Buyers can preview ${draft.duration_days <= 5 ? 'Day 1' : 'Day 1 and Day ' + (Math.floor(draft.duration_days / 2) + 1)} before purchasing</p>
+                  <p>Buyers can preview ${cardData.duration_days <= 5 ? 'Day 1' : 'Day 1 and Day ' + (Math.floor(cardData.duration_days / 2) + 1)} before purchasing</p>
                 </div>
               </div>
             </div>
@@ -124,7 +136,7 @@ const CreateStep4 = (() => {
               
               <label class="checkbox">
                 <input type="checkbox" id="check-value">
-                <span>My itinerary is worth €${draft.price_tier} and provides real value</span>
+                <span>My itinerary is worth €${cardData.price_tier} and provides real value</span>
               </label>
             </div>
             
@@ -135,15 +147,15 @@ const CreateStep4 = (() => {
               <div class="earnings-grid">
                 <div class="earning-row">
                   <span>Price:</span>
-                  <strong>€${draft.price_tier}</strong>
+                  <strong>€${cardData.price_tier}</strong>
                 </div>
                 <div class="earning-row highlight">
                   <span>Your earnings (85%):</span>
-                  <strong>€${(draft.price_tier * 0.85).toFixed(2)}</strong>
+                  <strong>€${(cardData.price_tier * 0.85).toFixed(2)}</strong>
                 </div>
                 <div class="earning-row">
                   <span>Platform fee (15%):</span>
-                  <span>€${(draft.price_tier * 0.15).toFixed(2)}</span>
+                  <span>€${(cardData.price_tier * 0.15).toFixed(2)}</span>
                 </div>
               </div>
               
@@ -152,17 +164,17 @@ const CreateStep4 = (() => {
                 <div class="projection-bars">
                   <div class="projection-bar">
                     <div class="bar" style="width: 40%"></div>
-                    <span>Conservative: €${((draft.price_tier * 0.85) * 10).toFixed(0)}</span>
+                    <span>Conservative: €${((cardData.price_tier * 0.85) * 10).toFixed(0)}</span>
                     <small>10 sales/month</small>
                   </div>
                   <div class="projection-bar">
                     <div class="bar" style="width: 70%"></div>
-                    <span>Average: €${((draft.price_tier * 0.85) * 25).toFixed(0)}</span>
+                    <span>Average: €${((cardData.price_tier * 0.85) * 25).toFixed(0)}</span>
                     <small>25 sales/month</small>
                   </div>
                   <div class="projection-bar">
                     <div class="bar" style="width: 100%"></div>
-                    <span>Top Creator: €${((draft.price_tier * 0.85) * 50).toFixed(0)}</span>
+                    <span>Top Creator: €${((cardData.price_tier * 0.85) * 50).toFixed(0)}</span>
                     <small>50+ sales/month</small>
                   </div>
                 </div>
@@ -291,90 +303,54 @@ const CreateStep4 = (() => {
   };
 
   // ============= RENDER MARKETPLACE CARD =============
-/**
- * REPLACE the renderMarketplaceCard function in your Step 4 with this:
- */
-
-// ============= RENDER MARKETPLACE CARD =============
-const renderMarketplaceCard = (draft, currentUser) => {
-  console.log('🔴 Step 4: Starting renderMarketplaceCard');
-  console.log('🔴 Step 4: Draft ID:', draft.id);
-  console.log('🔴 Step 4: Draft characteristic columns:', {
-    physical_demand: draft.physical_demand,
-    cultural_immersion: draft.cultural_immersion,
-    pace: draft.pace,
-    budget_level: draft.budget_level,
-    social_style: draft.social_style
-  });
-  
-  // Create the full itinerary object for the modal
-  const itineraryPreview = {
-    ...draft, // Spread ALL draft fields first (includes characteristic columns)
-    id: draft.id || CreateController.getCurrentDraftId(), 
-    title: draft.title || 'Untitled Itinerary',
-    destination: draft.destination || 'Unknown',
-    duration_days: draft.duration_days || 0,
-    description: draft.description || '',
-    price_tier: draft.price_tier || 9,
-    cover_image_url: draft.cover_image_url || '',
-    days: draft.days || [],
-    // Explicitly include characteristic columns to make sure they're passed
-    physical_demand: draft.physical_demand,
-    cultural_immersion: draft.cultural_immersion,
-    pace: draft.pace,
-    budget_level: draft.budget_level,
-    social_style: draft.social_style,
-    // Transportation, accommodation, travel tips
-    transportation: draft.transportation || {},
-    accommodation: draft.accommodation || {},
-    travel_tips: draft.travel_tips || {},
-    total_sales: 0,
-    view_count: 0,
-    creator: {
-      username: currentUser?.username || currentUser?.profile?.username || 'You',
-      avatar_url: currentUser?.avatar_url || currentUser?.profile?.avatar_url || '/images/default-avatar.png',
-      bio: currentUser?.bio || currentUser?.profile?.bio || '',
-      trip_count: 1
-    },
-    context: 'preview'
+  const renderMarketplaceCard = (cardData, currentUser) => {
+    console.log('🔴 Step 4: Starting renderMarketplaceCard');
+    console.log('🔴 Step 4: Card Data ID:', cardData.id);
+    console.log('🔴 Step 4: Card Data characteristics:', {
+      physical_demand: cardData.physical_demand,
+      cultural_immersion: cardData.cultural_immersion,
+      pace: cardData.pace,
+      budget_level: cardData.budget_level,
+      social_style: cardData.social_style
+    });
+    
+    // Prepare the card preview data
+    const cardPreview = {
+      ...cardData,
+      // Add creator info
+      creator: {
+        username: currentUser?.username || 'You',
+        avatar_url: currentUser?.avatar_url || '/images/default-avatar.png',
+        bio: currentUser?.bio || '',
+        trip_count: 1
+      },
+      context: 'preview'
+    };
+    
+    // Use ItineraryCard component if available
+    if (typeof ItineraryCard !== 'undefined') {
+      console.log('🟢 Step 4: Passing card data to ItineraryCard.create()');
+      
+      // Pass the card data - Modal will fetch its own data when opened
+      const cardHtml = ItineraryCard.create(cardPreview, 'preview');
+      
+      console.log('✅ Step 4: Card HTML created');
+      return cardHtml;
+      
+    } else {
+      console.log('❌ Step 4: Card component not available, using fallback');
+      // Fallback if component not loaded
+      return renderFallbackCard(cardPreview);
+    }
   };
-  
-  console.log('🔵 Step 4: Created itineraryPreview for modal with characteristics:', {
-    physical_demand: itineraryPreview.physical_demand,
-    cultural_immersion: itineraryPreview.cultural_immersion,
-    pace: itineraryPreview.pace,
-    budget_level: itineraryPreview.budget_level,
-    social_style: itineraryPreview.social_style
-  });
-  
-  // Store for modal access (KEEP THIS FOR THE MODAL!)
-  window.CreatePage = window.CreatePage || {};
-  window.CreatePage.getCurrentDraft = () => itineraryPreview;
-  
-  // Use ItineraryCard component if available
-  if (typeof ItineraryCard !== 'undefined') {
-    console.log('🟢 Step 4: Passing data to ItineraryCard.create()');
-    
-    // Pass the complete data to the card
-    const cardHtml = ItineraryCard.create(itineraryPreview, 'preview');
-    
-    console.log('✅ Step 4: Card HTML created');
-    return cardHtml;
-    
-  } else {
-    console.log('❌ Step 4: Card component not available, using fallback');
-    // Fallback if component not loaded
-    return renderFallbackCard(itineraryPreview);
-  }
-};
 
   // ============= FALLBACK CARD RENDER =============
   const renderFallbackCard = (itinerary) => {
-    const totalStops = itinerary.days?.reduce((sum, d) => sum + (d.stops?.length || 0), 0) || 0;
-    const stopsPerDay = itinerary.duration_days > 0 ? Math.round(totalStops / itinerary.duration_days) : 0;
+    const totalStops = itinerary.total_stops || 0;
+    const stopsPerDay = itinerary.stops_per_day || 0;
     
     return `
-      <div class="itinerary-card-fallback" data-itinerary-id="preview" data-context="preview">
+      <div class="itinerary-card-fallback" data-itinerary-id="${itinerary.id}" data-context="preview">
         <div class="card-image">
           ${itinerary.cover_image_url ? 
             `<img src="${itinerary.cover_image_url}" alt="${itinerary.title}">` :

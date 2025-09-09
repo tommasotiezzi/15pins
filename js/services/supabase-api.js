@@ -212,84 +212,182 @@ const API = {
       }
     },
 
-/**
- * REPLACE the getPreview method in your API.drafts object with this:
- */
+    /**
+     * NEW METHOD: Get minimal data needed for card preview
+     * Just the essentials for rendering the itinerary card
+     */
+    async getCardData(draftId) {
+      try {
+        const user = await API.auth.getUser();
+        if (!user) {
+          return { data: null, error: { message: 'Not authenticated' } };
+        }
 
-async getPreview(draftId) {
-  try {
-    const user = await API.auth.getUser();
-    if (!user) {
-      return { data: null, error: { message: 'Not authenticated' } };
-    }
+        // First get the main draft data
+        const { data: draft, error: draftError } = await supabase
+          .from('drafts')
+          .select(`
+            id,
+            title,
+            destination,
+            duration_days,
+            price_tier,
+            cover_image_url,
+            description
+          `)
+          .eq('id', draftId)
+          .eq('user_id', user.id)
+          .single();
 
-    const { data, error } = await supabase
-      .from('drafts')
-      .select(`
-        *,
-        draft_days (
-          *,
-          draft_stops (*)
-        ),
-        draft_characteristics (*),
-        draft_transportation (*),
-        draft_accommodation (*),
-        draft_travel_tips (*)
-      `)
-      .eq('id', draftId)
-      .eq('user_id', user.id)
-      .single();
-    
-    if (error) {
-      console.error('Error fetching draft preview:', error);
-      return { data: null, error };
-    }
-    
-    if (data) {
-      // Sort days and stops
-      if (data.draft_days) {
-        data.draft_days.sort((a, b) => a.day_number - b.day_number);
-        data.draft_days.forEach(day => {
-          if (day.draft_stops) {
-            day.draft_stops.sort((a, b) => a.position - b.position);
-          }
-        });
+        if (draftError || !draft) {
+          console.error('Error fetching draft:', draftError);
+          return { data: null, error: draftError || { message: 'Draft not found' } };
+        }
+
+        // Get characteristics separately
+        const { data: characteristics } = await supabase
+          .from('draft_characteristics')
+          .select(`
+            physical_demand,
+            cultural_immersion,
+            pace,
+            budget_level,
+            social_style
+          `)
+          .eq('draft_id', draftId)
+          .single();
+
+        // Get stop counts for stats
+        const { data: days } = await supabase
+          .from('draft_days')
+          .select(`
+            id,
+            draft_stops (id)
+          `)
+          .eq('draft_id', draftId);
+
+        // Calculate total stops
+        let totalStops = 0;
+        if (days) {
+          days.forEach(day => {
+            totalStops += day.draft_stops?.length || 0;
+          });
+        }
+
+        // Combine everything into card data
+        const cardData = {
+          ...draft,
+          // Add characteristics directly as properties
+          physical_demand: characteristics?.physical_demand || null,
+          cultural_immersion: characteristics?.cultural_immersion || null,
+          pace: characteristics?.pace || null,
+          budget_level: characteristics?.budget_level || null,
+          social_style: characteristics?.social_style || null,
+          // Add calculated stats
+          total_stops: totalStops,
+          stops_per_day: draft.duration_days > 0 ? Math.round(totalStops / draft.duration_days) : 0,
+          // Mock data for preview
+          total_sales: 0,
+          view_count: 0
+        };
+
+        console.log('API.drafts.getCardData - Returning:', cardData);
+        return { data: cardData, error: null };
+
+      } catch (err) {
+        console.error('Error in drafts.getCardData:', err);
+        return { data: null, error: err };
       }
-      
-      // Transform to preview format - DIRECTLY USE THE CHARACTERISTICS ARRAY
-      const transformedData = {
-        ...data,
-        days: data.draft_days?.map(day => ({
-          ...day,
-          stops: day.draft_stops || []
-        })) || [],
-        
-        // SIMPLE FIX: Pull directly from the characteristics array
-        physical_demand: data.draft_characteristics?.[0]?.physical_demand || null,
-        cultural_immersion: data.draft_characteristics?.[0]?.cultural_immersion || null,
-        pace: data.draft_characteristics?.[0]?.pace || null,
-        budget_level: data.draft_characteristics?.[0]?.budget_level || null,
-        social_style: data.draft_characteristics?.[0]?.social_style || null,
-        
-        // Keep nested format for compatibility
-        characteristics: data.draft_characteristics?.[0] || null,
-        transportation: data.draft_transportation?.[0] || null,
-        accommodation: data.draft_accommodation?.[0] || null,
-        travel_tips: data.draft_travel_tips?.[0] || null
-      };
-      
-      return {
-        data: transformedData,
-        error: null
-      };
-    }
-    
-    return { data: null, error: { message: 'Draft not found' } };
-  } catch (err) {
-    console.error('Error in drafts.getPreview:', err);
-    return { data: null, error: err };
-  }
-},
+    },
+
+    /**
+     * NEW METHOD: Get complete draft data for modal/full preview
+     * Everything needed for the trip modal
+     */
+    async getFullDraft(draftId) {
+      try {
+        const user = await API.auth.getUser();
+        if (!user) {
+          return { data: null, error: { message: 'Not authenticated' } };
+        }
+
+        // Get everything in one query
+        const { data, error } = await supabase
+          .from('drafts')
+          .select(`
+            *,
+            draft_days (
+              *,
+              draft_stops (*)
+            ),
+            draft_characteristics (*),
+            draft_transportation (*),
+            draft_accommodation (*),
+            draft_travel_tips (*)
+          `)
+          .eq('id', draftId)
+          .eq('user_id', user.id)
+          .single();
+
+        if (error || !data) {
+          console.error('Error fetching full draft:', error);
+          return { data: null, error: error || { message: 'Draft not found' } };
+        }
+
+        // Sort days and stops
+        if (data.draft_days) {
+          data.draft_days.sort((a, b) => a.day_number - b.day_number);
+          data.draft_days.forEach(day => {
+            if (day.draft_stops) {
+              day.draft_stops.sort((a, b) => a.position - b.position);
+            }
+          });
+        }
+
+        // Transform to cleaner structure
+        const fullDraft = {
+          ...data,
+          // Transform days array
+          days: data.draft_days?.map(day => ({
+            ...day,
+            stops: day.draft_stops || []
+          })) || [],
+          // Flatten characteristics
+          physical_demand: data.draft_characteristics?.[0]?.physical_demand || null,
+          cultural_immersion: data.draft_characteristics?.[0]?.cultural_immersion || null,
+          pace: data.draft_characteristics?.[0]?.pace || null,
+          budget_level: data.draft_characteristics?.[0]?.budget_level || null,
+          social_style: data.draft_characteristics?.[0]?.social_style || null,
+          // Flatten other essentials
+          transportation: data.draft_transportation?.[0] || null,
+          accommodation: data.draft_accommodation?.[0] || null,
+          travel_tips: data.draft_travel_tips?.[0] || null
+        };
+
+        // Remove the nested arrays
+        delete fullDraft.draft_days;
+        delete fullDraft.draft_characteristics;
+        delete fullDraft.draft_transportation;
+        delete fullDraft.draft_accommodation;
+        delete fullDraft.draft_travel_tips;
+
+        console.log('API.drafts.getFullDraft - Returning full draft data');
+        return { data: fullDraft, error: null };
+
+      } catch (err) {
+        console.error('Error in drafts.getFullDraft:', err);
+        return { data: null, error: err };
+      }
+    },
+
+    /**
+     * DEPRECATED: Use getCardData or getFullDraft instead
+     * Keeping for backward compatibility
+     */
+    async getPreview(draftId) {
+      console.warn('getPreview is deprecated. Use getCardData or getFullDraft instead.');
+      return this.getFullDraft(draftId);
+    },
 
     async list(userId) {
       if (!userId) {
