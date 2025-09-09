@@ -212,64 +212,102 @@ const API = {
       }
     },
 
-    async getPreview(draftId) {
-      try {
-        const user = await API.auth.getUser();
-        if (!user) {
-          return { data: null, error: { message: 'Not authenticated' } };
-        }
+/**
+ * REPLACE the getPreview method in your API.drafts object with this:
+ */
 
-        const { data, error } = await supabase
-          .from('drafts')
-          .select(`
-            *,
-            draft_days (
-              *,
-              draft_stops (*)
-            ),
-            draft_characteristics (*),
-            draft_transportation (*),
-            draft_accommodation (*),
-            draft_travel_tips (*)
-          `)
-          .eq('id', draftId)
-          .eq('user_id', user.id) // Ensure ownership
-          .single();
-        
-        if (data) {
-          // Sort days and stops
-          if (data.draft_days) {
-            data.draft_days.sort((a, b) => a.day_number - b.day_number);
-            data.draft_days.forEach(day => {
-              if (day.draft_stops) {
-                day.draft_stops.sort((a, b) => a.position - b.position);
-              }
-            });
+async getPreview(draftId) {
+  try {
+    const user = await API.auth.getUser();
+    if (!user) {
+      return { data: null, error: { message: 'Not authenticated' } };
+    }
+
+    const { data, error } = await supabase
+      .from('drafts')
+      .select(`
+        *,
+        draft_days (
+          *,
+          draft_stops (*)
+        ),
+        draft_characteristics (*),
+        draft_transportation (*),
+        draft_accommodation (*),
+        draft_travel_tips (*)
+      `)
+      .eq('id', draftId)
+      .eq('user_id', user.id)
+      .single();
+    
+    if (error) {
+      console.error('Error fetching draft preview:', error);
+      return { data: null, error };
+    }
+    
+    if (data) {
+      // Sort days and stops
+      if (data.draft_days) {
+        data.draft_days.sort((a, b) => a.day_number - b.day_number);
+        data.draft_days.forEach(day => {
+          if (day.draft_stops) {
+            day.draft_stops.sort((a, b) => a.position - b.position);
           }
-          
-          // Transform to preview format
-          return {
-            data: {
-              ...data,
-              days: data.draft_days?.map(day => ({
-                ...day,
-                stops: day.draft_stops || []
-              })) || [],
-              characteristics: data.draft_characteristics?.[0] || null,
-              transportation: data.draft_transportation?.[0] || null,
-              accommodation: data.draft_accommodation?.[0] || null,
-              travel_tips: data.draft_travel_tips?.[0] || null
-            },
-            error: null
-          };
-        }
-        
-        return { data: null, error };
-      } catch (err) {
-        console.error('Error in drafts.getPreview:', err);
-        return { data: null, error: err };
+        });
       }
-    },
+      
+      // CRITICAL FIX: Flatten characteristics onto the main object
+      if (data.draft_characteristics && data.draft_characteristics.length > 0) {
+        const chars = data.draft_characteristics[0];
+        data.physical_demand = chars.physical_demand;
+        data.cultural_immersion = chars.cultural_immersion;
+        data.pace = chars.pace;
+        data.budget_level = chars.budget_level;
+        data.social_style = chars.social_style;
+      }
+      
+      // Transform to preview format
+      const transformedData = {
+        ...data,
+        days: data.draft_days?.map(day => ({
+          ...day,
+          stops: day.draft_stops || []
+        })) || [],
+        
+        // Keep the flattened characteristics on the main object
+        physical_demand: data.physical_demand || null,
+        cultural_immersion: data.cultural_immersion || null,
+        pace: data.pace || null,
+        budget_level: data.budget_level || null,
+        social_style: data.social_style || null,
+        
+        // Also provide them in nested format for compatibility
+        characteristics: data.draft_characteristics?.[0] || null,
+        transportation: data.draft_transportation?.[0] || null,
+        accommodation: data.draft_accommodation?.[0] || null,
+        travel_tips: data.draft_travel_tips?.[0] || null
+      };
+      
+      console.log('API.drafts.getPreview - Returning data with characteristics:', {
+        physical_demand: transformedData.physical_demand,
+        cultural_immersion: transformedData.cultural_immersion,
+        pace: transformedData.pace,
+        budget_level: transformedData.budget_level,
+        social_style: transformedData.social_style
+      });
+      
+      return {
+        data: transformedData,
+        error: null
+      };
+    }
+    
+    return { data: null, error: { message: 'Draft not found' } };
+  } catch (err) {
+    console.error('Error in drafts.getPreview:', err);
+    return { data: null, error: err };
+  }
+},
 
     async list(userId) {
       if (!userId) {
