@@ -845,13 +845,7 @@ const API = {
     async list(filters = {}) {
       let query = supabase
         .from('itineraries')
-        .select(`
-          *,
-          creator:profiles!itineraries_creator_id_fkey(
-            username,
-            avatar_url
-          )
-        `);
+        .select('*');
 
       // Apply filters
       if (filters.creator_id) {
@@ -919,22 +913,51 @@ const API = {
       query = query.range(from, to);
 
       const { data, error } = await query;
+      
+      // Add creator info manually if needed
+      if (data && data.length > 0) {
+        // Fetch creator profiles separately
+        const creatorIds = [...new Set(data.map(item => item.creator_id))];
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, username, avatar_url')
+          .in('id', creatorIds);
+        
+        // Map profiles to itineraries
+        if (profiles) {
+          const profileMap = {};
+          profiles.forEach(profile => {
+            profileMap[profile.id] = profile;
+          });
+          
+          data.forEach(item => {
+            item.creator = profileMap[item.creator_id] || null;
+          });
+        }
+      }
+      
       return { data, error };
     },
 
     async get(itineraryId) {
       const { data, error } = await supabase
         .from('itineraries')
-        .select(`
-          *,
-          creator:profiles!itineraries_creator_id_fkey(
-            username,
-            avatar_url,
-            bio
-          )
-        `)
+        .select('*')
         .eq('id', itineraryId)
         .single();
+
+      if (data && !error) {
+        // Fetch creator profile separately
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('id, username, avatar_url, bio')
+          .eq('id', data.creator_id)
+          .single();
+        
+        if (profile) {
+          data.creator = profile;
+        }
+      }
 
       return { data, error };
     },
@@ -986,16 +1009,35 @@ const API = {
         .select(`
           itinerary_id,
           added_at,
-          itinerary:itineraries(
-            *,
-            creator:profiles(
-              username,
-              avatar_url
-            )
-          )
+          itinerary:itineraries(*)
         `)
         .eq('user_id', userId)
         .order('added_at', { ascending: false });
+
+      // Add creator info to itineraries
+      if (data && data.length > 0) {
+        const itinerariesWithCreators = data.filter(item => item.itinerary);
+        if (itinerariesWithCreators.length > 0) {
+          const creatorIds = [...new Set(itinerariesWithCreators.map(item => item.itinerary.creator_id))];
+          const { data: profiles } = await supabase
+            .from('profiles')
+            .select('id, username, avatar_url')
+            .in('id', creatorIds);
+          
+          if (profiles) {
+            const profileMap = {};
+            profiles.forEach(profile => {
+              profileMap[profile.id] = profile;
+            });
+            
+            data.forEach(item => {
+              if (item.itinerary) {
+                item.itinerary.creator = profileMap[item.itinerary.creator_id] || null;
+              }
+            });
+          }
+        }
+      }
 
       return { data, error };
     },
