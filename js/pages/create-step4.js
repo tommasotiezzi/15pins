@@ -291,65 +291,82 @@ const CreateStep4 = (() => {
   };
 
   // ============= RENDER MARKETPLACE CARD =============
-  const renderMarketplaceCard = (draft, currentUser) => {
-    console.log('Full draft object from DB:', draft);
-    console.log('Draft characteristic columns:', {
-      physical_demand: draft.physical_demand,
-      cultural_immersion: draft.cultural_immersion,
-      pace: draft.pace,
-      budget_level: draft.budget_level,
-      social_style: draft.social_style
-    });
-    
-    // Create itinerary preview with ALL draft fields including characteristic columns
-    const itineraryPreview = {
-      ...draft, // Spread ALL draft fields first (includes characteristic columns)
-      id: draft.id || draftId, 
-      title: draft.title || 'Untitled Itinerary',
-      destination: draft.destination || 'Unknown',
-      duration_days: draft.duration_days || 0,
-      description: draft.description || '',
-      price_tier: draft.price_tier || 9,
-      cover_image_url: draft.cover_image_url || '',
-      days: draft.days || [],
-      // Explicitly include characteristic columns to make sure they're passed
-      physical_demand: draft.physical_demand,
-      cultural_immersion: draft.cultural_immersion,
-      pace: draft.pace,
-      budget_level: draft.budget_level,
-      social_style: draft.social_style,
-      // Transportation, accommodation, travel tips
-      transportation: draft.transportation || {},
-      accommodation: draft.accommodation || {},
-      travel_tips: draft.travel_tips || {},
-      total_sales: 0,
-      view_count: 0,
-      creator: {
-        username: currentUser?.username || currentUser?.profile?.username || 'You',
-        avatar_url: currentUser?.avatar_url || currentUser?.profile?.avatar_url || '/images/default-avatar.png',
-        bio: currentUser?.bio || currentUser?.profile?.bio || '',
-        trip_count: 1
-      },
-      context: 'preview'
-    };
-    
-    console.log('Created itineraryPreview with characteristic columns:', {
-      physical_demand: itineraryPreview.physical_demand,
-      cultural_immersion: itineraryPreview.cultural_immersion,
-      pace: itineraryPreview.pace,
-      budget_level: itineraryPreview.budget_level,
-      social_style: itineraryPreview.social_style
-    });
-    
+/**
+ * REPLACE the renderMarketplaceCard function in your Step 4 with this:
+ */
 
-    // Use ItineraryCard component if available
-    if (typeof ItineraryCard !== 'undefined') {
-      return ItineraryCard.create(itineraryPreview, 'preview');
-    } else {
-      // Fallback if component not loaded
-      return renderFallbackCard(itineraryPreview);
-    }
+// ============= RENDER MARKETPLACE CARD =============
+const renderMarketplaceCard = (draft, currentUser) => {
+  console.log('🔴 Step 4: Starting renderMarketplaceCard');
+  console.log('🔴 Step 4: Draft ID:', draft.id);
+  console.log('🔴 Step 4: Draft characteristic columns:', {
+    physical_demand: draft.physical_demand,
+    cultural_immersion: draft.cultural_immersion,
+    pace: draft.pace,
+    budget_level: draft.budget_level,
+    social_style: draft.social_style
+  });
+  
+  // Create the full itinerary object for the modal
+  const itineraryPreview = {
+    ...draft, // Spread ALL draft fields first (includes characteristic columns)
+    id: draft.id || CreateController.getCurrentDraftId(), 
+    title: draft.title || 'Untitled Itinerary',
+    destination: draft.destination || 'Unknown',
+    duration_days: draft.duration_days || 0,
+    description: draft.description || '',
+    price_tier: draft.price_tier || 9,
+    cover_image_url: draft.cover_image_url || '',
+    days: draft.days || [],
+    // Explicitly include characteristic columns to make sure they're passed
+    physical_demand: draft.physical_demand,
+    cultural_immersion: draft.cultural_immersion,
+    pace: draft.pace,
+    budget_level: draft.budget_level,
+    social_style: draft.social_style,
+    // Transportation, accommodation, travel tips
+    transportation: draft.transportation || {},
+    accommodation: draft.accommodation || {},
+    travel_tips: draft.travel_tips || {},
+    total_sales: 0,
+    view_count: 0,
+    creator: {
+      username: currentUser?.username || currentUser?.profile?.username || 'You',
+      avatar_url: currentUser?.avatar_url || currentUser?.profile?.avatar_url || '/images/default-avatar.png',
+      bio: currentUser?.bio || currentUser?.profile?.bio || '',
+      trip_count: 1
+    },
+    context: 'preview'
   };
+  
+  console.log('🔵 Step 4: Created itineraryPreview for modal with characteristics:', {
+    physical_demand: itineraryPreview.physical_demand,
+    cultural_immersion: itineraryPreview.cultural_immersion,
+    pace: itineraryPreview.pace,
+    budget_level: itineraryPreview.budget_level,
+    social_style: itineraryPreview.social_style
+  });
+  
+  // Store for modal access (KEEP THIS FOR THE MODAL!)
+  window.CreatePage = window.CreatePage || {};
+  window.CreatePage.getCurrentDraft = () => itineraryPreview;
+  
+  // Use ItineraryCard component if available
+  if (typeof ItineraryCard !== 'undefined') {
+    console.log('🟢 Step 4: Passing data to ItineraryCard.create()');
+    
+    // Pass the complete data to the card
+    const cardHtml = ItineraryCard.create(itineraryPreview, 'preview');
+    
+    console.log('✅ Step 4: Card HTML created');
+    return cardHtml;
+    
+  } else {
+    console.log('❌ Step 4: Card component not available, using fallback');
+    // Fallback if component not loaded
+    return renderFallbackCard(itineraryPreview);
+  }
+};
 
   // ============= FALLBACK CARD RENDER =============
   const renderFallbackCard = (itinerary) => {
