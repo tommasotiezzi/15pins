@@ -82,17 +82,27 @@ const API = {
     },
 
     async getUser() {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return null;
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return null;
 
-      // Get profile data
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single();
+        // Get profile data
+        const { data: profile, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single();
 
-      return profile ? { ...user, profile } : user;
+        if (error) {
+          console.error('Error fetching profile:', error);
+          return user; // Return user without profile if profile fetch fails
+        }
+
+        return profile ? { ...user, ...profile, id: user.id } : user;
+      } catch (error) {
+        console.error('Error in getUser:', error);
+        return null;
+      }
     },
 
     onAuthStateChange(callback) {
@@ -149,57 +159,44 @@ const API = {
     },
 
     async get(draftId) {
-      const { data, error } = await supabase
-        .from('drafts')
-        .select(`
-          *,
-          draft_days (
+      try {
+        // First verify the user is authenticated
+        const user = await API.auth.getUser();
+        if (!user) {
+          return { data: null, error: { message: 'Not authenticated', code: '401' } };
+        }
+        
+        // Query with user_id check to ensure ownership
+        const { data, error } = await supabase
+          .from('drafts')
+          .select(`
             *,
-            draft_stops (
-              *
-            )
-          ),
-          draft_characteristics (*),
-          draft_transportation (*),
-          draft_accommodation (*),
-          draft_travel_tips (*)
-        `)
-        .eq('id', draftId)
-        .single();
+            draft_days (
+              *,
+              draft_stops (
+                *
+              )
+            ),
+            draft_characteristics (*),
+            draft_transportation (*),
+            draft_accommodation (*),
+            draft_travel_tips (*)
+          `)
+          .eq('id', draftId)
+          .eq('user_id', user.id) // Ensure draft belongs to user
+          .single();
 
-      // Sort days and stops by their order
-      if (data?.draft_days) {
-        data.draft_days.sort((a, b) => a.day_number - b.day_number);
-        data.draft_days.forEach(day => {
-          if (day.draft_stops) {
-            day.draft_stops.sort((a, b) => a.position - b.position);
-          }
-        });
-      }
+        if (error) {
+          console.error('Error fetching draft:', error);
+          return { data: null, error };
+        }
 
-      return { data, error };
-    },
+        if (!data) {
+          return { data: null, error: { message: 'Draft not found or access denied', code: '404' } };
+        }
 
-    async getPreview(draftId) {
-      const { data, error } = await supabase
-        .from('drafts')
-        .select(`
-          *,
-          draft_days (
-            *,
-            draft_stops (*)
-          ),
-          draft_characteristics (*),
-          draft_transportation (*),
-          draft_accommodation (*),
-          draft_travel_tips (*)
-        `)
-        .eq('id', draftId)
-        .single();
-      
-      if (data) {
-        // Sort days and stops
-        if (data.draft_days) {
+        // Sort days and stops by their order
+        if (data?.draft_days) {
           data.draft_days.sort((a, b) => a.day_number - b.day_number);
           data.draft_days.forEach(day => {
             if (day.draft_stops) {
@@ -207,28 +204,80 @@ const API = {
             }
           });
         }
-        
-        // Transform to preview format
-        return {
-          data: {
-            ...data,
-            days: data.draft_days?.map(day => ({
-              ...day,
-              stops: day.draft_stops || []
-            })) || [],
-            characteristics: data.draft_characteristics?.[0] || null,
-            transportation: data.draft_transportation?.[0] || null,
-            accommodation: data.draft_accommodation?.[0] || null,
-            travel_tips: data.draft_travel_tips?.[0] || null
-          },
-          error: null
-        };
+
+        return { data, error: null };
+      } catch (err) {
+        console.error('Error in drafts.get:', err);
+        return { data: null, error: err };
       }
-      
-      return { data: null, error };
+    },
+
+    async getPreview(draftId) {
+      try {
+        const user = await API.auth.getUser();
+        if (!user) {
+          return { data: null, error: { message: 'Not authenticated' } };
+        }
+
+        const { data, error } = await supabase
+          .from('drafts')
+          .select(`
+            *,
+            draft_days (
+              *,
+              draft_stops (*)
+            ),
+            draft_characteristics (*),
+            draft_transportation (*),
+            draft_accommodation (*),
+            draft_travel_tips (*)
+          `)
+          .eq('id', draftId)
+          .eq('user_id', user.id) // Ensure ownership
+          .single();
+        
+        if (data) {
+          // Sort days and stops
+          if (data.draft_days) {
+            data.draft_days.sort((a, b) => a.day_number - b.day_number);
+            data.draft_days.forEach(day => {
+              if (day.draft_stops) {
+                day.draft_stops.sort((a, b) => a.position - b.position);
+              }
+            });
+          }
+          
+          // Transform to preview format
+          return {
+            data: {
+              ...data,
+              days: data.draft_days?.map(day => ({
+                ...day,
+                stops: day.draft_stops || []
+              })) || [],
+              characteristics: data.draft_characteristics?.[0] || null,
+              transportation: data.draft_transportation?.[0] || null,
+              accommodation: data.draft_accommodation?.[0] || null,
+              travel_tips: data.draft_travel_tips?.[0] || null
+            },
+            error: null
+          };
+        }
+        
+        return { data: null, error };
+      } catch (err) {
+        console.error('Error in drafts.getPreview:', err);
+        return { data: null, error: err };
+      }
     },
 
     async list(userId) {
+      if (!userId) {
+        const user = await API.auth.getUser();
+        if (!user) return { data: [], error: { message: 'Not authenticated' } };
+        userId = user.id;
+      }
+      
       const { data, error } = await supabase
         .from('drafts')
         .select('*')
@@ -236,10 +285,13 @@ const API = {
         .eq('is_published', false)
         .order('updated_at', { ascending: false });
 
-      return { data, error };
+      return { data: data || [], error };
     },
 
     async update(draftId, updates) {
+      const user = await API.auth.getUser();
+      if (!user) return { error: { message: 'Not authenticated' } };
+      
       // Update draft metadata INCLUDING LOCATION FIELDS
       const { data, error } = await supabase
         .from('drafts')
@@ -254,9 +306,11 @@ const API = {
           lat: updates.lat !== undefined ? updates.lat : undefined,
           lng: updates.lng !== undefined ? updates.lng : undefined,
           has_unsaved_changes: false,
-          last_saved_at: new Date().toISOString()
+          last_saved_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
         })
         .eq('id', draftId)
+        .eq('user_id', user.id) // Ensure ownership
         .select()
         .single();
 
@@ -297,7 +351,8 @@ const API = {
             lng: draftData.lng || null,
             current_step: draftData.current_step,
             has_unsaved_changes: false,
-            last_saved_at: new Date().toISOString()
+            last_saved_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
           })
           .eq('id', draftId)
           .eq('user_id', user.id);
@@ -398,15 +453,22 @@ const API = {
     },
 
     async delete(draftId) {
+      const user = await API.auth.getUser();
+      if (!user) return { error: { message: 'Not authenticated' } };
+      
       const { error } = await supabase
         .from('drafts')
         .delete()
-        .eq('id', draftId);
+        .eq('id', draftId)
+        .eq('user_id', user.id); // Ensure ownership
 
       return { error };
     },
 
     async publish(draftId) {
+      const user = await API.auth.getUser();
+      if (!user) return { error: { message: 'Not authenticated' } };
+      
       // Call the publish_draft function we defined in SQL
       const { data, error } = await supabase
         .rpc('publish_draft', { draft_id_input: draftId });

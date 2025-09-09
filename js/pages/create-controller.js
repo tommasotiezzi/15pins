@@ -150,14 +150,48 @@ const CreateController = (() => {
 
   // ============= LOAD DRAFT FROM DATABASE =============
   const loadDraft = async (draftId) => {
+    // Clear any existing state first
+    if (currentDraftId && currentDraftId !== draftId) {
+      console.log('Switching from draft', currentDraftId, 'to', draftId);
+      // Clear current draft state
+      currentDraftId = null;
+      currentStep = 1;
+    }
+    
     showLoadingOverlay('Loading draft...');
     
     try {
+      // Verify user is authenticated first
+      const user = await API.auth.getUser();
+      if (!user) {
+        Toast.error('Please log in to continue');
+        Router.navigate('feed');
+        return;
+      }
+      
       // Fetch fresh data from database
       const { data: draft, error } = await API.drafts.get(draftId);
       
-      if (error || !draft) {
+      if (error) {
+        console.error('Error fetching draft:', error);
+        if (error.code === '406') {
+          Toast.error('Draft not accessible. Please check your permissions.');
+        } else {
+          Toast.error('Failed to load draft');
+        }
+        showDraftSelector();
+        return;
+      }
+      
+      if (!draft) {
         Toast.error('Draft not found');
+        showDraftSelector();
+        return;
+      }
+      
+      // Verify draft belongs to current user
+      if (draft.user_id !== user.id) {
+        Toast.error('You do not have access to this draft');
         showDraftSelector();
         return;
       }

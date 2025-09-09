@@ -462,3 +462,85 @@ select.form-control {
     padding: var(--space-sm);
   }
 }
+
+/* Draft Info Bar - Make "All Drafts" button more prominent */
+.draft-info-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-md);
+  background: var(--white);
+  border-bottom: 2px solid var(--gray-200);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.draft-info-bar .btn-ghost {
+  /* Make the "All Drafts" button more visible */
+  border: 1px solid var(--gray-300);
+  background: var(--gray-50);
+  color: var(--gray-700);
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.draft-info-bar .btn-ghost:hover {
+  background: var(--gray-100);
+  border-color: var(--gray-400);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+/* Add an icon to make it clearer */
+.draft-info-bar .btn-ghost::before {
+  content: "← ";
+  margin-right: 4px;
+  font-weight: bold;
+}
+
+/* Draft title styling */
+#draft-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--gray-900);
+  margin-right: var(--space-sm);
+}
+
+/* Draft status indicator */
+.draft-status {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  margin-left: var(--space-sm);
+}
+
+.draft-status.saved {
+  background: var(--green-50);
+  color: var(--green-700);
+}
+
+.draft-status.unsaved {
+  background: var(--yellow-50);
+  color: var(--yellow-700);
+}
+
+/* Alternative: Make it look like a tab */
+.draft-info-bar .btn-ghost.alt-style {
+  background: linear-gradient(to bottom, var(--white), var(--gray-50));
+  border: 2px solid var(--primary-500);
+  color: var(--primary-600);
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.draft-info-bar .btn-ghost.alt-style:hover {
+  background: var(--primary-50);
+  transform: scale(1.02);
+}
