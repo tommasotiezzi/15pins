@@ -1,9 +1,13 @@
 /**
  * Create Step 2 - Days Builder
- * Handles day-by-day itinerary building with stops
+ * Database is the single source of truth, UI state is local only
  */
 
 const CreateStep2 = (() => {
+  
+  // ============= LOCAL UI STATE (EPHEMERAL) =============
+  let selectedDayIndex = 0; // Which day is currently being edited (UI only)
+  let currentDraft = null; // Cache of current draft data from DB
   
   // ============= INITIALIZATION =============
   const init = () => {
@@ -21,45 +25,112 @@ const CreateStep2 = (() => {
     Events.on('action:go-to-review', handleGoToReview);
   };
 
-  // ============= RENDER STEP =============
-  const render = () => {
-    const draft = CreateController.getCurrentDraft();
-    if (!draft) return;
+  // ============= RENDER STEP (ASYNC NOW) =============
+  const render = async () => {
+    const draftId = CreateController.getCurrentDraftId();
+    if (!draftId) {
+      Toast.error('No draft found');
+      return;
+    }
+    
+    // Fetch fresh data from database
+    const { data: draft, error } = await API.drafts.get(draftId);
+    if (error || !draft) {
+      Toast.error('Failed to load draft');
+      return;
+    }
+    
+    currentDraft = draft;
+    
+    // Reset UI state when rendering fresh (no persistence of selection)
+    selectedDayIndex = 0;
     
     showPriceTierNotice();
     renderDaysList();
     
-    // Select first day if none selected
-    const selectedId = CreateController.getSelectedDayId();
-    if (selectedId === null && draft.days?.length > 0) {
-      selectDay({ data: { dayId: 0 } });
-    } else if (selectedId !== null) {
+    // Select first day if we have days
+    if (draft.draft_days && draft.draft_days.length > 0) {
       renderDayEditor();
+    } else {
+      // No days yet - shouldn't happen after Step 1 but handle gracefully
+      await initializeDays();
     }
+  };
+
+  // ============= INITIALIZE DAYS IF MISSING =============
+  const initializeDays = async () => {
+    if (!currentDraft) return;
+    
+    const draftId = CreateController.getCurrentDraftId();
+    const days = [];
+    
+    for (let i = 1; i <= currentDraft.duration_days; i++) {
+      days.push({
+        day_number: i,
+        title: `Day ${i}`,
+        description: '',
+        stops: []
+      });
+    }
+    
+    // Save to database
+    const { error } = await API.drafts.saveComplete(draftId, {
+      ...currentDraft,
+      days: days
+    });
+    
+    if (error) {
+      Toast.error('Failed to initialize days');
+      return;
+    }
+    
+    // Reload draft with new days
+    const { data: updatedDraft } = await API.drafts.get(draftId);
+    currentDraft = updatedDraft;
+    
+    renderDaysList();
+    renderDayEditor();
   };
 
   // ============= SAVE STEP (Called by Controller) =============
   const saveStep = async () => {
-    // Save current form values before saving
-    saveCurrentFormValues();
-    
-    const draft = CreateController.getCurrentDraft();
     const draftId = CreateController.getCurrentDraftId();
-    
-    if (!draft || !draftId) {
+    if (!draftId || !currentDraft) {
       throw new Error('No draft to save');
     }
     
-    // Prepare data for save
+    // Transform draft_days/draft_stops back to the format saveComplete expects
+    const days = currentDraft.draft_days.map(day => ({
+      day_number: day.day_number,
+      title: day.title,
+      description: day.description,
+      stops: (day.draft_stops || []).map(stop => ({
+        name: stop.name,
+        type: stop.type,
+        tip: stop.tip,
+        time_period: stop.time_period,
+        start_time: stop.start_time,
+        duration_minutes: stop.duration_minutes,
+        cost_cents: stop.cost_cents,
+        description: stop.description,
+        link: stop.link,
+        location: stop.location,
+        lat: stop.lat,
+        lng: stop.lng,
+        place_id: stop.place_id,
+        formatted_address: stop.formatted_address
+      }))
+    }));
+    
     const draftData = {
-      title: draft.title,
-      destination: draft.destination,
-      duration_days: draft.duration_days,
-      description: draft.description,
-      cover_image_url: draft.cover_image_url || '',
+      title: currentDraft.title,
+      destination: currentDraft.destination,
+      duration_days: currentDraft.duration_days,
+      description: currentDraft.description,
+      cover_image_url: currentDraft.cover_image_url || '',
+      price_tier: currentDraft.price_tier,
       current_step: 2,
-      price_tier: draft.price_tier,
-      days: draft.days || []
+      days: days
     };
     
     const { error } = await API.drafts.saveComplete(draftId, draftData);
@@ -75,20 +146,21 @@ const CreateStep2 = (() => {
       return;
     }
     
-    // Save current form values
-    saveCurrentFormValues();
-    
-    // Transition to Step 3
-    CreateController.handleStepTransition(2, 3);
+    // Save before transitioning
+    try {
+      await saveStep();
+      CreateController.renderStep(3);
+    } catch (error) {
+      Toast.error('Failed to save progress');
+    }
   };
 
   // ============= PRICE TIER NOTICE =============
   const showPriceTierNotice = () => {
     const notice = document.getElementById('tier-notice');
-    const draft = CreateController.getCurrentDraft();
-    if (!notice || !draft) return;
+    if (!notice || !currentDraft) return;
     
-    const isDetailed = draft.price_tier === 19;
+    const isDetailed = currentDraft.price_tier === 19;
     
     notice.className = isDetailed ? 'price-tier-notice detailed' : 'price-tier-notice';
     notice.innerHTML = isDetailed ? 
@@ -99,19 +171,17 @@ const CreateStep2 = (() => {
   // ============= DAYS LIST SIDEBAR =============
   const renderDaysList = () => {
     const container = document.getElementById('days-list');
-    const draft = CreateController.getCurrentDraft();
-    if (!container || !draft) return;
+    if (!container || !currentDraft) return;
     
-    const days = draft.days || [];
-    const selectedId = CreateController.getSelectedDayId();
+    const days = currentDraft.draft_days || [];
     
     container.innerHTML = days.map((day, index) => {
-      const stopCount = day.stops?.length || 0;
+      const stopCount = day.draft_stops?.length || 0;
       
       return `
-        <div class="day-item ${selectedId === index ? 'active' : ''}" 
+        <div class="day-item ${selectedDayIndex === index ? 'active' : ''}" 
              data-action="select-day" 
-             data-day-id="${index}">
+             data-day-index="${index}">
           <div>
             <strong>${day.title}</strong>
             ${day.description ? `<div class="text-light">${day.description}</div>` : ''}
@@ -124,15 +194,7 @@ const CreateStep2 = (() => {
 
   // ============= SELECT DAY =============
   const selectDay = ({ data }) => {
-    // Save current form values before switching
-    const currentId = CreateController.getSelectedDayId();
-    if (currentId !== null) {
-      saveCurrentFormValues();
-    }
-    
-    const dayId = parseInt(data.dayId);
-    CreateController.setSelectedDayId(dayId);
-    
+    selectedDayIndex = parseInt(data.dayIndex);
     renderDaysList();
     renderDayEditor();
   };
@@ -140,15 +202,12 @@ const CreateStep2 = (() => {
   // ============= DAY EDITOR =============
   const renderDayEditor = () => {
     const container = document.getElementById('day-editor-content');
-    const draft = CreateController.getCurrentDraft();
-    const selectedId = CreateController.getSelectedDayId();
+    if (!container || !currentDraft) return;
     
-    if (!container || !draft || selectedId === null) return;
-    
-    const day = draft.days[selectedId];
+    const day = currentDraft.draft_days[selectedDayIndex];
     if (!day) return;
     
-    const isDetailed = draft.price_tier === 19;
+    const isDetailed = currentDraft.price_tier === 19;
     
     container.innerHTML = `
       <div>
@@ -169,18 +228,18 @@ const CreateStep2 = (() => {
           <h3>Stops for ${day.title}</h3>
           <button class="btn btn-sm btn-secondary" 
                   data-action="duplicate-day" 
-                  data-day-id="${selectedId}">
+                  data-day-index="${selectedDayIndex}">
             Duplicate Day
           </button>
         </div>
         
         <div id="stops-container">
-          ${renderStops(day.stops || [], isDetailed)}
+          ${renderStops(day.draft_stops || [], isDetailed)}
         </div>
         
         <button class="btn btn-primary" 
                 data-action="add-stop" 
-                data-day-id="${selectedId}">
+                data-day-index="${selectedDayIndex}">
           + Add Stop
         </button>
       </div>
@@ -351,123 +410,112 @@ const CreateStep2 = (() => {
     }
   };
 
-  // ============= SAVE CURRENT FORM VALUES =============
-  const saveCurrentFormValues = () => {
-    const draft = CreateController.getCurrentDraft();
-    const selectedId = CreateController.getSelectedDayId();
-    
-    if (!draft || selectedId === null) return;
-    
-    const day = draft.days[selectedId];
-    if (!day) return;
-    
-    // Save day title and description
-    const dayTitle = document.querySelector('.day-title-input');
-    if (dayTitle) {
-      day.title = dayTitle.value;
-    }
-    
-    const dayDesc = document.querySelector('input[placeholder*="Brief description"]');
-    if (dayDesc) {
-      day.description = dayDesc.value;
-    }
-    
-    // Save all stop values
-    document.querySelectorAll('.stop-item').forEach((stopEl, index) => {
-      if (!day.stops || !day.stops[index]) return;
-      
-      const stop = day.stops[index];
-      
-      // Save all input fields for this stop
-      stopEl.querySelectorAll('input, textarea, select').forEach(input => {
-        const field = input.dataset.field;
-        if (!field) return;
-        
-        let value = input.value;
-        
-        // Handle special fields
-        if (field === 'cost_cents' && value) {
-          value = parseFloat(value) * 100; // Convert euros to cents
-        } else if (input.type === 'number' && value) {
-          value = parseFloat(value) || 0;
-        }
-        
-        stop[field] = value;
-      });
-    });
-  };
-
   // ============= ADD DAY =============
-  const addDay = () => {
-    const draft = CreateController.getCurrentDraft();
-    if (!draft) return;
+  const addDay = async () => {
+    if (!currentDraft) return;
     
-    // Save current values first
-    saveCurrentFormValues();
-    
+    const newDayNumber = currentDraft.draft_days.length + 1;
     const newDay = {
-      day_number: draft.days.length + 1,
-      title: `Day ${draft.days.length + 1}`,
+      day_number: newDayNumber,
+      title: `Day ${newDayNumber}`,
       description: '',
       stops: []
     };
     
-    draft.days.push(newDay);
-    CreateController.markAsUnsaved();
+    // Add to local state
+    currentDraft.draft_days.push({
+      ...newDay,
+      draft_stops: []
+    });
+    
+    // Save to database
+    await saveStep();
+    
+    // Refresh from database to get new IDs
+    const draftId = CreateController.getCurrentDraftId();
+    const { data: updatedDraft } = await API.drafts.get(draftId);
+    currentDraft = updatedDraft;
+    
+    // Select the new day
+    selectedDayIndex = currentDraft.draft_days.length - 1;
     
     renderDaysList();
-    selectDay({ data: { dayId: draft.days.length - 1 } });
+    renderDayEditor();
   };
 
   // ============= DUPLICATE DAY =============
-  const duplicateDay = ({ data }) => {
-    const draft = CreateController.getCurrentDraft();
-    if (!draft) return;
+  const duplicateDay = async ({ data }) => {
+    if (!currentDraft) return;
     
-    // Save current values first
-    saveCurrentFormValues();
-    
-    const dayToDuplicate = draft.days[data.dayId];
+    const dayToDuplicate = currentDraft.draft_days[data.dayIndex];
     if (!dayToDuplicate) return;
     
+    const newDayNumber = currentDraft.draft_days.length + 1;
+    
+    // Create new day with duplicated stops
     const newDay = {
-      ...dayToDuplicate,
-      day_number: draft.days.length + 1,
+      day_number: newDayNumber,
       title: `${dayToDuplicate.title} (Copy)`,
-      stops: dayToDuplicate.stops.map(stop => ({ ...stop }))
+      description: dayToDuplicate.description,
+      stops: (dayToDuplicate.draft_stops || []).map(stop => ({
+        name: stop.name,
+        type: stop.type,
+        tip: stop.tip,
+        time_period: stop.time_period,
+        start_time: stop.start_time,
+        duration_minutes: stop.duration_minutes,
+        cost_cents: stop.cost_cents,
+        description: stop.description,
+        link: stop.link,
+        location: stop.location,
+        lat: stop.lat,
+        lng: stop.lng,
+        place_id: stop.place_id,
+        formatted_address: stop.formatted_address
+      }))
     };
     
-    draft.days.push(newDay);
-    CreateController.markAsUnsaved();
+    // Add to local state temporarily
+    currentDraft.draft_days.push({
+      ...newDay,
+      draft_stops: newDay.stops
+    });
+    
+    // Save to database
+    await saveStep();
+    
+    // Refresh from database
+    const draftId = CreateController.getCurrentDraftId();
+    const { data: updatedDraft } = await API.drafts.get(draftId);
+    currentDraft = updatedDraft;
+    
+    // Select the new day
+    selectedDayIndex = currentDraft.draft_days.length - 1;
     
     renderDaysList();
-    selectDay({ data: { dayId: draft.days.length - 1 } });
+    renderDayEditor();
     
     Toast.success('Day duplicated');
   };
 
   // ============= ADD STOP =============
-  const addStop = ({ data }) => {
-    const draft = CreateController.getCurrentDraft();
-    const selectedId = CreateController.getSelectedDayId();
+  const addStop = async ({ data }) => {
+    if (!currentDraft) return;
     
-    if (!draft || selectedId === null) return;
+    const day = currentDraft.draft_days[selectedDayIndex];
+    if (!day) return;
     
-    // Save current values first
-    saveCurrentFormValues();
-    
-    const day = draft.days[selectedId];
-    if (!day.stops) {
-      day.stops = [];
+    if (!day.draft_stops) {
+      day.draft_stops = [];
     }
     
     const newStop = {
       name: '',
       type: 'attraction',
-      position: day.stops.length + 1
+      position: day.draft_stops.length + 1
     };
     
-    if (draft.price_tier === 19) {
+    if (currentDraft.price_tier === 19) {
       // Add detailed fields
       Object.assign(newStop, {
         time_period: '',
@@ -481,7 +529,9 @@ const CreateStep2 = (() => {
       newStop.tip = '';
     }
     
-    day.stops.push(newStop);
+    day.draft_stops.push(newStop);
+    
+    // Don't save immediately - just update UI
     CreateController.markAsUnsaved();
     
     renderDaysList();
@@ -497,20 +547,16 @@ const CreateStep2 = (() => {
   };
 
   // ============= REMOVE STOP =============
-  const removeStop = ({ data }) => {
-    const draft = CreateController.getCurrentDraft();
-    const selectedId = CreateController.getSelectedDayId();
+  const removeStop = async ({ data }) => {
+    if (!currentDraft) return;
     
-    if (!draft || selectedId === null) return;
+    const day = currentDraft.draft_days[selectedDayIndex];
+    if (!day || !day.draft_stops) return;
     
-    // Save current values first
-    saveCurrentFormValues();
-    
-    const day = draft.days[selectedId];
-    day.stops.splice(data.stopIndex, 1);
+    day.draft_stops.splice(data.stopIndex, 1);
     
     // Update positions
-    day.stops.forEach((stop, index) => {
+    day.draft_stops.forEach((stop, index) => {
       stop.position = index + 1;
     });
     
@@ -524,14 +570,12 @@ const CreateStep2 = (() => {
 
   // ============= UPDATE STOP FIELD =============
   const updateStopField = ({ data, target }) => {
-    const draft = CreateController.getCurrentDraft();
-    const selectedId = CreateController.getSelectedDayId();
+    if (!currentDraft) return;
     
-    if (!draft || selectedId === null) return;
+    const day = currentDraft.draft_days[selectedDayIndex];
+    if (!day || !day.draft_stops) return;
     
-    const day = draft.days[selectedId];
-    const stop = day.stops[data.stopIndex];
-    
+    const stop = day.draft_stops[data.stopIndex];
     if (!stop) return;
     
     let value = target.value;
@@ -559,23 +603,25 @@ const CreateStep2 = (() => {
     
     // Day title/description handlers
     container.querySelectorAll('[data-field]').forEach(input => {
-      input.addEventListener('change', (e) => {
-        const draft = CreateController.getCurrentDraft();
-        const selectedId = CreateController.getSelectedDayId();
-        if (!draft || selectedId === null) return;
-        
-        const day = draft.days[selectedId];
-        const field = e.target.dataset.field;
-        
-        if (field === 'title') {
-          day.title = e.target.value;
-          renderDaysList(); // Update sidebar
-        } else if (field === 'description') {
-          day.description = e.target.value;
-        }
-        
-        CreateController.markAsUnsaved();
-      });
+      if (!input.dataset.action) { // Only for day-level fields
+        input.addEventListener('change', (e) => {
+          if (!currentDraft) return;
+          
+          const day = currentDraft.draft_days[selectedDayIndex];
+          if (!day) return;
+          
+          const field = e.target.dataset.field;
+          
+          if (field === 'title') {
+            day.title = e.target.value;
+            renderDaysList(); // Update sidebar
+          } else if (field === 'description') {
+            day.description = e.target.value;
+          }
+          
+          CreateController.markAsUnsaved();
+        });
+      }
     });
     
     // Stop field handlers
@@ -596,11 +642,12 @@ const CreateStep2 = (() => {
 
   // ============= VALIDATION =============
   const validateDays = () => {
-    const draft = CreateController.getCurrentDraft();
-    if (!draft || !draft.days) return false;
+    if (!currentDraft || !currentDraft.draft_days) return false;
     
     // Check each day has at least one stop
-    const emptyDays = draft.days.filter(day => !day.stops || day.stops.length === 0);
+    const emptyDays = currentDraft.draft_days.filter(day => 
+      !day.draft_stops || day.draft_stops.length === 0
+    );
     
     if (emptyDays.length > 0) {
       const dayNumbers = emptyDays.map(d => d.day_number).join(', ');
@@ -609,15 +656,15 @@ const CreateStep2 = (() => {
     }
     
     // Check that stops have required fields
-    for (const day of draft.days) {
-      for (const stop of day.stops) {
+    for (const day of currentDraft.draft_days) {
+      for (const stop of (day.draft_stops || [])) {
         if (!stop.name?.trim()) {
           Toast.error(`All stops must have a name (${day.title})`);
           return false;
         }
         
         // For basic tier, check tips
-        if (draft.price_tier === 9 && !stop.tip?.trim()) {
+        if (currentDraft.price_tier === 9 && !stop.tip?.trim()) {
           Toast.error(`All stops must have insider tips (${day.title})`);
           return false;
         }
@@ -632,8 +679,7 @@ const CreateStep2 = (() => {
     init,
     render,
     saveStep,
-    validateDays,
-    saveCurrentFormValues
+    validateDays
   };
 })();
 
