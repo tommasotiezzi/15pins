@@ -1,14 +1,17 @@
 /**
- * Create Step 1 - Basic Setup
- * Handles initial itinerary setup: title, destination, duration, price tier
+ * Create Step 1 - Basic Setup with Google Places Integration
+ * Handles initial itinerary setup: title, destination (with Places API), duration, price tier
  */
 
 const CreateStep1 = (() => {
+  let selectedPlace = null; // Store the selected place data
+  let currentSuggestions = []; // Store current suggestions
   
   // ============= INITIALIZATION =============
   const init = () => {
     // Setup form events
     Events.on('action:continue-setup', handleContinue);
+    Events.on('action:clear-destination', handleClearDestination);
     Events.on('form:setup', handleFormSubmit);
   };
 
@@ -19,12 +22,244 @@ const CreateStep1 = (() => {
     
     populateForm(draft);
     updateCharacterCounts();
+    setupDestinationAutocomplete();
     
     // Lock price tier if already set
     if (draft.tier_locked) {
       const radios = document.querySelectorAll('input[name="product_type"]');
       radios.forEach(radio => radio.disabled = true);
     }
+  };
+
+  // ============= SETUP DESTINATION AUTOCOMPLETE =============
+  const setupDestinationAutocomplete = () => {
+    const input = document.getElementById('destination');
+    const suggestionsDiv = document.getElementById('destination-suggestions');
+    if (!input || !suggestionsDiv) return;
+
+    // Remove any existing listeners
+    input.removeEventListener('input', handleDestinationInput);
+    input.removeEventListener('focus', handleDestinationFocus);
+    
+    // Add new listeners
+    input.addEventListener('input', handleDestinationInput);
+    input.addEventListener('focus', handleDestinationFocus);
+    
+    // Close dropdown when clicking outside
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('.destination-input-wrapper')) {
+        suggestionsDiv.classList.remove('active');
+      }
+    });
+    
+    // Handle keyboard navigation
+    input.addEventListener('keydown', handleDestinationKeydown);
+  };
+
+  // ============= HANDLE DESTINATION INPUT =============
+  const handleDestinationInput = async (e) => {
+    const query = e.target.value.trim();
+    const suggestionsDiv = document.getElementById('destination-suggestions');
+    
+    if (query.length < 3) {
+      suggestionsDiv.classList.remove('active');
+      currentSuggestions = [];
+      return;
+    }
+    
+    // Show loading state
+    suggestionsDiv.innerHTML = '<div class="autocomplete-loading">Searching...</div>';
+    suggestionsDiv.classList.add('active');
+    
+    try {
+      // Search for destinations (cities, regions, countries)
+      const suggestions = await GooglePlacesService.searchPlaces(query, {
+        types: ["locality", "administrative_area_level_1", "country", "sublocality"],
+        maxSuggestions: 5
+      });
+      
+      currentSuggestions = suggestions;
+      
+      if (suggestions.length === 0) {
+        suggestionsDiv.innerHTML = '<div class="autocomplete-no-results">No destinations found</div>';
+      } else {
+        renderSuggestions(suggestions);
+      }
+    } catch (error) {
+      console.error('Places search error:', error);
+      suggestionsDiv.innerHTML = '<div class="autocomplete-no-results">Search failed. Please try again.</div>';
+    }
+  };
+
+  // ============= HANDLE DESTINATION FOCUS =============
+  const handleDestinationFocus = () => {
+    const suggestionsDiv = document.getElementById('destination-suggestions');
+    if (currentSuggestions.length > 0) {
+      suggestionsDiv.classList.add('active');
+    }
+  };
+
+  // ============= HANDLE KEYBOARD NAVIGATION =============
+  const handleDestinationKeydown = (e) => {
+    const suggestionsDiv = document.getElementById('destination-suggestions');
+    const suggestions = suggestionsDiv.querySelectorAll('.autocomplete-suggestion');
+    const selected = suggestionsDiv.querySelector('.autocomplete-suggestion.selected');
+    
+    if (!suggestionsDiv.classList.contains('active')) return;
+    
+    let index = -1;
+    if (selected) {
+      index = Array.from(suggestions).indexOf(selected);
+    }
+    
+    switch(e.key) {
+      case 'ArrowDown':
+        e.preventDefault();
+        if (index < suggestions.length - 1) {
+          if (selected) selected.classList.remove('selected');
+          suggestions[index + 1].classList.add('selected');
+        }
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        if (index > 0) {
+          if (selected) selected.classList.remove('selected');
+          suggestions[index - 1].classList.add('selected');
+        }
+        break;
+      case 'Enter':
+        e.preventDefault();
+        if (selected) {
+          const placeId = selected.dataset.placeId;
+          const suggestion = currentSuggestions.find(s => s.placeId === placeId);
+          if (suggestion) {
+            selectPlace(suggestion);
+          }
+        }
+        break;
+      case 'Escape':
+        suggestionsDiv.classList.remove('active');
+        break;
+    }
+  };
+
+  // ============= RENDER SUGGESTIONS =============
+  const renderSuggestions = (suggestions) => {
+    const suggestionsDiv = document.getElementById('destination-suggestions');
+    
+    suggestionsDiv.innerHTML = suggestions.map(suggestion => `
+      <div class="autocomplete-suggestion" data-place-id="${suggestion.placeId}">
+        <svg class="suggestion-icon" width="20" height="20" fill="none">
+          <path d="M10 2C6 2 3 5 3 9C3 13 10 20 10 20C10 20 17 13 17 9C17 5 14 2 10 2Z" 
+                stroke="currentColor" stroke-width="1.5"/>
+        </svg>
+        <div class="suggestion-text">
+          <div class="suggestion-main">${suggestion.mainText}</div>
+          ${suggestion.secondaryText ? 
+            `<div class="suggestion-secondary">${suggestion.secondaryText}</div>` : ''}
+        </div>
+      </div>
+    `).join('');
+    
+    // Add click handlers
+    suggestionsDiv.querySelectorAll('.autocomplete-suggestion').forEach(el => {
+      el.addEventListener('click', () => {
+        const placeId = el.dataset.placeId;
+        const suggestion = suggestions.find(s => s.placeId === placeId);
+        if (suggestion) {
+          selectPlace(suggestion);
+        }
+      });
+      
+      el.addEventListener('mouseenter', () => {
+        suggestionsDiv.querySelectorAll('.selected').forEach(s => s.classList.remove('selected'));
+        el.classList.add('selected');
+      });
+    });
+  };
+
+  // ============= SELECT PLACE =============
+  const selectPlace = async (suggestion) => {
+    const input = document.getElementById('destination');
+    const suggestionsDiv = document.getElementById('destination-suggestions');
+    const selectedDiv = document.getElementById('selected-destination');
+    const displaySpan = document.getElementById('destination-display');
+    
+    // Hide suggestions
+    suggestionsDiv.classList.remove('active');
+    
+    // Show loading state
+    input.disabled = true;
+    
+    try {
+      // Get full place details
+      const placeDetails = await GooglePlacesService.getPlaceDetails(suggestion.placeId);
+      
+      if (placeDetails) {
+        selectedPlace = placeDetails;
+        
+        // Update display
+        input.value = placeDetails.displayName || suggestion.description;
+        
+        // Show selected destination badge
+        const flagEmoji = getFlagEmoji(placeDetails.countryCode);
+        displaySpan.textContent = `${flagEmoji} ${placeDetails.city || placeDetails.displayName}, ${placeDetails.country}`;
+        selectedDiv.style.display = 'block';
+        
+        // Populate hidden fields
+        document.getElementById('place_id').value = placeDetails.placeId || '';
+        document.getElementById('country').value = placeDetails.country || '';
+        document.getElementById('country_code').value = placeDetails.countryCode || '';
+        document.getElementById('region').value = placeDetails.region || '';
+        document.getElementById('city').value = placeDetails.city || '';
+        document.getElementById('lat').value = placeDetails.lat || '';
+        document.getElementById('lng').value = placeDetails.lng || '';
+        
+        // Mark as unsaved
+        CreateController.markAsUnsaved();
+      }
+    } catch (error) {
+      console.error('Failed to get place details:', error);
+      Toast.error('Failed to get destination details');
+    } finally {
+      input.disabled = false;
+    }
+  };
+
+  // ============= CLEAR DESTINATION =============
+  const handleClearDestination = () => {
+    selectedPlace = null;
+    
+    // Clear visible elements
+    document.getElementById('destination').value = '';
+    document.getElementById('selected-destination').style.display = 'none';
+    
+    // Clear hidden fields
+    document.getElementById('place_id').value = '';
+    document.getElementById('country').value = '';
+    document.getElementById('country_code').value = '';
+    document.getElementById('region').value = '';
+    document.getElementById('city').value = '';
+    document.getElementById('lat').value = '';
+    document.getElementById('lng').value = '';
+    
+    // Focus back on input
+    document.getElementById('destination').focus();
+    
+    // Mark as unsaved
+    CreateController.markAsUnsaved();
+  };
+
+  // ============= GET FLAG EMOJI =============
+  const getFlagEmoji = (countryCode) => {
+    if (!countryCode || countryCode.length !== 2) return '';
+    
+    const codePoints = countryCode
+      .toUpperCase()
+      .split('')
+      .map(char => 127397 + char.charCodeAt());
+    
+    return String.fromCodePoint(...codePoints);
   };
 
   // ============= CONTINUE TO STEP 2 =============
@@ -38,6 +273,13 @@ const CreateStep1 = (() => {
     // Validate form
     if (!form.checkValidity()) {
       form.reportValidity();
+      return;
+    }
+    
+    // Validate that a place was selected
+    if (!selectedPlace && !document.getElementById('place_id').value) {
+      Toast.error('Please select a destination from the dropdown');
+      document.getElementById('destination').focus();
       return;
     }
     
@@ -69,12 +311,21 @@ const CreateStep1 = (() => {
       }
     }
     
-    // Update draft with form data
+    // Update draft with form data including location fields
     draft.title = data.title;
     draft.destination = data.destination;
     draft.duration_days = parseInt(data.duration);
     draft.description = data.description;
     draft.price_tier = parseInt(data.product_type);
+    
+    // Add location data
+    draft.place_id = data.place_id;
+    draft.country = data.country;
+    draft.country_code = data.country_code;
+    draft.region = data.region;
+    draft.city = data.city;
+    draft.lat = data.lat ? parseFloat(data.lat) : null;
+    draft.lng = data.lng ? parseFloat(data.lng) : null;
     
     // Save and continue
     try {
@@ -86,6 +337,14 @@ const CreateStep1 = (() => {
         duration_days: parseInt(data.duration),
         description: data.description,
         price_tier: parseInt(data.product_type),
+        // Add location fields
+        place_id: data.place_id,
+        country: data.country,
+        country_code: data.country_code,
+        region: data.region,
+        city: data.city,
+        lat: data.lat ? parseFloat(data.lat) : null,
+        lng: data.lng ? parseFloat(data.lng) : null,
         current_step: 2,
         days: draft.days || createDefaultDays(parseInt(data.duration))
       };
@@ -123,6 +382,11 @@ const CreateStep1 = (() => {
       throw new Error('Invalid form data');
     }
     
+    // Validate that a place was selected
+    if (!selectedPlace && !document.getElementById('place_id').value) {
+      throw new Error('Please select a destination from the dropdown');
+    }
+    
     const formData = new FormData(form);
     const data = Object.fromEntries(formData.entries());
     const draftId = CreateController.getCurrentDraftId();
@@ -137,6 +401,14 @@ const CreateStep1 = (() => {
       duration_days: parseInt(data.duration),
       description: data.description,
       price_tier: parseInt(data.product_type),
+      // Add location fields
+      place_id: data.place_id,
+      country: data.country,
+      country_code: data.country_code,
+      region: data.region,
+      city: data.city,
+      lat: data.lat ? parseFloat(data.lat) : null,
+      lng: data.lng ? parseFloat(data.lng) : null,
       current_step: CreateController.getCurrentStep()
     };
     
@@ -164,6 +436,37 @@ const CreateStep1 = (() => {
     // Price tier
     const priceRadio = form.querySelector(`input[name="product_type"][value="${draft.price_tier}"]`);
     if (priceRadio) priceRadio.checked = true;
+    
+    // Populate location fields if they exist
+    if (draft.place_id) {
+      document.getElementById('place_id').value = draft.place_id;
+      document.getElementById('country').value = draft.country || '';
+      document.getElementById('country_code').value = draft.country_code || '';
+      document.getElementById('region').value = draft.region || '';
+      document.getElementById('city').value = draft.city || '';
+      document.getElementById('lat').value = draft.lat || '';
+      document.getElementById('lng').value = draft.lng || '';
+      
+      // Show selected destination badge
+      if (draft.city || draft.country) {
+        const selectedDiv = document.getElementById('selected-destination');
+        const displaySpan = document.getElementById('destination-display');
+        const flagEmoji = getFlagEmoji(draft.country_code);
+        displaySpan.textContent = `${flagEmoji} ${draft.city || draft.destination}, ${draft.country}`;
+        selectedDiv.style.display = 'block';
+        
+        // Store as selected place
+        selectedPlace = {
+          placeId: draft.place_id,
+          country: draft.country,
+          countryCode: draft.country_code,
+          region: draft.region,
+          city: draft.city,
+          lat: draft.lat,
+          lng: draft.lng
+        };
+      }
+    }
     
     // Add change listeners
     form.addEventListener('input', (e) => {
@@ -242,6 +545,13 @@ const CreateStep1 = (() => {
         form[field]?.focus();
         return false;
       }
+    }
+    
+    // Check that a place was selected
+    if (!selectedPlace && !document.getElementById('place_id').value) {
+      Toast.error('Please select a destination from the dropdown');
+      document.getElementById('destination').focus();
+      return false;
     }
     
     // Check price tier

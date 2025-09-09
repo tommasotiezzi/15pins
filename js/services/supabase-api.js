@@ -240,11 +240,19 @@ const API = {
     },
 
     async update(draftId, updates) {
-      // Update draft metadata
+      // Update draft metadata INCLUDING LOCATION FIELDS
       const { data, error } = await supabase
         .from('drafts')
         .update({
           ...updates,
+          // Include location fields if present
+          place_id: updates.place_id !== undefined ? updates.place_id : undefined,
+          country: updates.country !== undefined ? updates.country : undefined,
+          country_code: updates.country_code !== undefined ? updates.country_code : undefined,
+          region: updates.region !== undefined ? updates.region : undefined,
+          city: updates.city !== undefined ? updates.city : undefined,
+          lat: updates.lat !== undefined ? updates.lat : undefined,
+          lng: updates.lng !== undefined ? updates.lng : undefined,
           has_unsaved_changes: false,
           last_saved_at: new Date().toISOString()
         })
@@ -269,7 +277,7 @@ const API = {
           throw new Error('Not authenticated');
         }
 
-        // 1. Update draft metadata
+        // 1. Update draft metadata INCLUDING LOCATION FIELDS
         console.log('Updating draft metadata...');
         const { error: draftError } = await supabase
           .from('drafts')
@@ -279,6 +287,14 @@ const API = {
             duration_days: draftData.duration_days,
             description: draftData.description,
             cover_image_url: draftData.cover_image_url,
+            // ADD LOCATION FIELDS
+            place_id: draftData.place_id || null,
+            country: draftData.country || null,
+            country_code: draftData.country_code || null,
+            region: draftData.region || null,
+            city: draftData.city || null,
+            lat: draftData.lat || null,
+            lng: draftData.lng || null,
             current_step: draftData.current_step,
             has_unsaved_changes: false,
             last_saved_at: new Date().toISOString()
@@ -345,7 +361,10 @@ const API = {
                 description: stop.description || null,
                 link: stop.link || null,
                 lat: stop.lat || null,
-                lng: stop.lng || null
+                lng: stop.lng || null,
+                // ADD PLACE FIELDS FOR STOPS
+                place_id: stop.place_id || null,
+                formatted_address: stop.formatted_address || null
               }));
               
               allStopsToInsert.push(...stopsForDay);
@@ -585,6 +604,9 @@ const API = {
         .from('draft_stops')
         .insert({
           draft_day_id: dayId,
+          // Include place fields if present
+          place_id: stopData.place_id || null,
+          formatted_address: stopData.formatted_address || null,
           ...stopData
         })
         .select()
@@ -596,7 +618,12 @@ const API = {
     async update(stopId, updates) {
       const { data, error } = await supabase
         .from('draft_stops')
-        .update(updates)
+        .update({
+          // Include place fields if present in updates
+          place_id: updates.place_id !== undefined ? updates.place_id : undefined,
+          formatted_address: updates.formatted_address !== undefined ? updates.formatted_address : undefined,
+          ...updates
+        })
         .eq('id', stopId)
         .select()
         .single();
@@ -650,17 +677,53 @@ const API = {
       if (filters.creator_id) {
         query = query.eq('creator_id', filters.creator_id);
       }
+      
+      // LOCATION FILTERS
+      if (filters.country_code) {
+        query = query.eq('country_code', filters.country_code);
+      }
+      if (filters.country) {
+        query = query.ilike('country', `%${filters.country}%`);
+      }
+      if (filters.city) {
+        query = query.ilike('city', `%${filters.city}%`);
+      }
+      
+      // SEARCH FILTER (searches multiple fields)
+      if (filters.search) {
+        query = query.or(`destination.ilike.%${filters.search}%,title.ilike.%${filters.search}%,country.ilike.%${filters.search}%,city.ilike.%${filters.search}%`);
+      }
+      
+      // Legacy destination filter (keep for backward compatibility)
       if (filters.destination) {
         query = query.ilike('destination', `%${filters.destination}%`);
       }
+      
+      // Duration filters
       if (filters.min_duration) {
         query = query.gte('duration_days', filters.min_duration);
       }
       if (filters.max_duration) {
         query = query.lte('duration_days', filters.max_duration);
       }
+      
+      // Price filter
       if (filters.price_tier) {
         query = query.eq('price_tier', filters.price_tier);
+      }
+      
+      // CHARACTERISTIC FILTERS
+      if (filters.physical_demand) {
+        query = query.eq('characteristics->>physical_demand', filters.physical_demand);
+      }
+      if (filters.budget_level) {
+        query = query.eq('characteristics->>budget_level', filters.budget_level);
+      }
+      if (filters.pace) {
+        query = query.eq('characteristics->>pace', filters.pace);
+      }
+      if (filters.best_for) {
+        query = query.eq('characteristics->>social_style', filters.best_for);
       }
 
       // Sorting

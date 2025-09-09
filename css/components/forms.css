@@ -291,3 +291,174 @@ select.form-control {
     justify-content: center;
   }
 }
+
+/* ==================== Google Places Autocomplete Styles ==================== */
+/* Add this to your /css/pages/create.css or /css/components/forms.css */
+
+/* Destination input wrapper */
+.destination-input-wrapper {
+  position: relative;
+}
+
+/* Autocomplete dropdown */
+.autocomplete-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: var(--white);
+  border: 2px solid var(--border-light);
+  border-top: none;
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+  max-height: 300px;
+  overflow-y: auto;
+  z-index: 100;
+  box-shadow: var(--shadow-lg);
+  display: none;
+}
+
+.autocomplete-dropdown.active {
+  display: block;
+}
+
+/* Autocomplete suggestions */
+.autocomplete-suggestion {
+  padding: var(--space-md);
+  cursor: pointer;
+  border-bottom: 1px solid var(--border-light);
+  transition: background-color var(--transition-fast);
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.autocomplete-suggestion:last-child {
+  border-bottom: none;
+}
+
+.autocomplete-suggestion:hover,
+.autocomplete-suggestion.selected {
+  background: var(--bg-secondary);
+}
+
+.autocomplete-suggestion .suggestion-icon {
+  width: 20px;
+  height: 20px;
+  color: var(--text-light);
+  flex-shrink: 0;
+}
+
+.suggestion-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.suggestion-main {
+  font-weight: var(--font-medium);
+  color: var(--text-primary);
+  font-size: var(--text-sm);
+}
+
+.suggestion-secondary {
+  color: var(--text-light);
+  font-size: var(--text-xs);
+}
+
+/* Loading state */
+.autocomplete-dropdown.loading::after {
+  content: 'Searching...';
+  display: block;
+  padding: var(--space-md);
+  text-align: center;
+  color: var(--text-light);
+  font-size: var(--text-sm);
+}
+
+/* No results */
+.autocomplete-no-results {
+  padding: var(--space-md);
+  text-align: center;
+  color: var(--text-light);
+  font-size: var(--text-sm);
+}
+
+/* Selected destination display */
+.selected-destination {
+  margin-top: var(--space-sm);
+  animation: slideIn var(--transition-base);
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.destination-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-xs) var(--space-md);
+  background: var(--primary-alpha-10);
+  border: 2px solid var(--primary-alpha-20);
+  border-radius: var(--radius-full);
+  font-size: var(--text-sm);
+  color: var(--primary);
+  font-weight: var(--font-medium);
+}
+
+.destination-badge .clear-destination {
+  background: none;
+  border: none;
+  color: var(--primary);
+  font-size: var(--text-lg);
+  cursor: pointer;
+  padding: 0;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-full);
+  transition: all var(--transition-fast);
+}
+
+.destination-badge .clear-destination:hover {
+  background: var(--primary);
+  color: var(--white);
+}
+
+/* Country flag emoji */
+.country-flag {
+  font-size: var(--text-lg);
+  margin-right: var(--space-xs);
+}
+
+/* Validation states */
+.destination-input-wrapper.invalid .form-control {
+  border-color: var(--danger);
+}
+
+.destination-error {
+  color: var(--danger);
+  font-size: var(--text-xs);
+  margin-top: var(--space-xs);
+}
+
+/* Mobile adjustments */
+@media (max-width: 768px) {
+  .autocomplete-dropdown {
+    max-height: 200px;
+  }
+  
+  .autocomplete-suggestion {
+    padding: var(--space-sm);
+  }
+}

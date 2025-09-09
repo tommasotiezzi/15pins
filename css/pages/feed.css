@@ -236,3 +236,105 @@
     font-size: var(--text-base);
   }
 }
+
+/* ==================== Search Bar Styles ==================== */
+/* Add this to your /css/pages/feed.css file */
+
+.search-container {
+  position: relative;
+  margin-bottom: var(--space-lg);
+  max-width: 500px;
+}
+
+.search-input {
+  width: 100%;
+  padding: var(--space-sm) var(--space-md);
+  padding-left: var(--space-3xl);
+  background: var(--white);
+  border: 2px solid var(--border-light);
+  border-radius: var(--radius-full);
+  font-size: var(--text-sm);
+  transition: all var(--transition-fast);
+  color: var(--text-primary);
+}
+
+.search-input:hover {
+  border-color: var(--border-medium);
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-alpha-10);
+}
+
+.search-input::placeholder {
+  color: var(--text-light);
+}
+
+.search-icon {
+  position: absolute;
+  left: var(--space-md);
+  top: 50%;
+  transform: translateY(-50%);
+  width: 20px;
+  height: 20px;
+  color: var(--text-light);
+  pointer-events: none;
+}
+
+/* Loading state for search */
+.search-container.searching::after {
+  content: '';
+  position: absolute;
+  right: var(--space-md);
+  top: 50%;
+  transform: translateY(-50%);
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--primary-alpha-20);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: translateY(-50%) rotate(360deg); }
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .search-container {
+    max-width: 100%;
+    margin-bottom: var(--space-md);
+  }
+  
+  .search-input {
+    font-size: var(--text-base);
+  }
+}
+
+/* Make filter chips wrap nicely on smaller screens */
+.filter-chips {
+  display: flex;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+@media (max-width: 1024px) {
+  .filter-chips {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--space-sm);
+  }
+}
+
+@media (max-width: 640px) {
+  .filter-chips {
+    grid-template-columns: 1fr;
+  }
+  
+  .filter-select {
+    width: 100%;
+  }
+}
