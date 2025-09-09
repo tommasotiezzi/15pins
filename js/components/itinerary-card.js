@@ -244,10 +244,10 @@ const ItineraryCard = (() => {
         <div class="card-footer-enhanced">
           ${itinerary.creator ? `
             <div class="creator-info-enhanced">
-              <img src="${itinerary.creator.avatar_url || '/images/default-avatar.png'}" 
+              <img src="${itinerary.creator.avatar_url || 'https://i.pravatar.cc/60'}" 
                    alt="${itinerary.creator.username || 'Creator'}" 
                    class="creator-avatar-small"
-                   onerror="this.src='/images/default-avatar.png'">
+                   onerror="this.src='https://i.pravatar.cc/60'">
               <span class="creator-name">${itinerary.creator.username || 'Anonymous'}</span>
             </div>
           ` : ''}

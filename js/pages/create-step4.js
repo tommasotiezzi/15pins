@@ -320,7 +320,7 @@ const CreateStep4 = (() => {
       // Add creator info
       creator: {
         username: currentUser?.username || 'You',
-        avatar_url: currentUser?.avatar_url || '/images/default-avatar.png',
+        avatar_url: currentUser?.avatar_url || 'https://i.pravatar.cc/60',
         bio: currentUser?.bio || '',
         trip_count: 1
       },

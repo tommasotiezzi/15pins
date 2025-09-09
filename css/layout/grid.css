@@ -9,7 +9,8 @@
 }
 
 /* ==================== Itinerary Grid ==================== */
-.itinerary-grid {
+.itinerary-grid,
+.itinerary-cards-grid {  /* Added the actual class name used by ItineraryCard component */
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
   gap: var(--space-lg);
@@ -62,7 +63,8 @@
 
 /* ==================== Responsive Grid ==================== */
 @media (max-width: 1024px) {
-  .itinerary-grid {
+  .itinerary-grid,
+  .itinerary-cards-grid {
     grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   }
   
@@ -76,7 +78,8 @@
 }
 
 @media (max-width: 768px) {
-  .itinerary-grid {
+  .itinerary-grid,
+  .itinerary-cards-grid {
     grid-template-columns: 1fr;
     padding: var(--space-lg) 0;
   }
@@ -94,7 +97,8 @@
 }
 
 @media (max-width: 480px) {
-  .itinerary-grid {
+  .itinerary-grid,
+  .itinerary-cards-grid {
     gap: var(--space-md);
   }
 }
