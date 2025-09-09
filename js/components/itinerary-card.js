@@ -455,32 +455,36 @@ const ItineraryCard = (() => {
     document.addEventListener('click', (e) => {
       // Handle wishlist button clicks
       if (e.target.closest('[data-action="wishlist"]')) {
+        e.stopPropagation();
         const button = e.target.closest('[data-action="wishlist"]');
         const itineraryId = button.dataset.id;
         handleWishlistToggle(itineraryId, button);
-        e.stopPropagation();
       }
       
       // Handle back to build button
       if (e.target.closest('[data-action="back-to-build"]')) {
-        Events.emit('create:continue-editing');
         e.stopPropagation();
+        Events.emit('create:continue-editing');
+        // Also close modal if open
+        if (typeof TripModal !== 'undefined' && TripModal.close) {
+          TripModal.close();
+        }
       }
       
       // Handle edit button
       if (e.target.closest('[data-action="edit-itinerary"]')) {
+        e.stopPropagation();
         const button = e.target.closest('[data-action="edit-itinerary"]');
         const itineraryId = button.dataset.id;
         window.location.href = `/create?edit=${itineraryId}`;
-        e.stopPropagation();
       }
       
       // Handle stats button
       if (e.target.closest('[data-action="view-stats"]')) {
+        e.stopPropagation();
         const button = e.target.closest('[data-action="view-stats"]');
         const itineraryId = button.dataset.id;
         Events.emit('analytics:open', { itineraryId });
-        e.stopPropagation();
       }
     });
     
