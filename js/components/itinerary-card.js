@@ -263,6 +263,12 @@ const ItineraryCard = (() => {
       return;
     }
     
+    console.log('🔴🔴🔴 OPENING MODAL');
+    console.log('ID being passed:', itineraryId);
+    console.log('Context:', context);
+    console.log('Using API:', context === 'preview' ? 'API.drafts.getPreview' : 'API.itineraries.get');
+    console.log('This means querying table:', context === 'preview' ? 'DRAFTS TABLE' : 'ITINERARIES TABLE');
+    
     try {
       // Always fetch fresh data
       // Use drafts API for draft itineraries, regular API for published
@@ -270,15 +276,26 @@ const ItineraryCard = (() => {
         await API.drafts.getPreview(itineraryId) :
         await API.itineraries.get(itineraryId);
       
+      console.log('🔵 FULL API Response:', response);
+      console.log('🔵 Response.data:', response?.data);
+      
       if (response.error || !response.data) {
-        console.error('Failed to load itinerary:', response.error);
+        console.error('❌ Failed to load itinerary:', response.error);
         Toast.error('Failed to load itinerary');
         return;
       }
       
       const itinerary = response.data;
       
-      console.log('Opening modal with itinerary:', itinerary);
+      console.log('🟢 SUCCESS - Fetched itinerary:');
+      console.log('ID from response:', itinerary.id);
+      console.log('Characteristics from response:');
+      console.log('  - physical_demand:', itinerary.physical_demand);
+      console.log('  - cultural_immersion:', itinerary.cultural_immersion);
+      console.log('  - pace:', itinerary.pace);
+      console.log('  - budget_level:', itinerary.budget_level);
+      console.log('  - social_style:', itinerary.social_style);
+      console.log('================================\n');
       
       // Emit event to open modal
       Events.emit('trip-modal:open', { 
@@ -287,7 +304,7 @@ const ItineraryCard = (() => {
       });
       
     } catch (error) {
-      console.error('Error opening modal:', error);
+      console.error('❌ Error opening modal:', error);
       Toast.error('Failed to open itinerary');
     }
   };
