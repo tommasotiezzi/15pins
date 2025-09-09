@@ -36,6 +36,22 @@ const GooglePlacesService = (() => {
   };
 
   /**
+   * Create a debounced version of a function
+   */
+  const debounce = (func, delay) => {
+    let timeoutId;
+    return (...args) => {
+      clearTimeout(timeoutId);
+      return new Promise((resolve) => {
+        timeoutId = setTimeout(async () => {
+          const result = await func(...args);
+          resolve(result);
+        }, delay);
+      });
+    };
+  };
+
+  /**
    * Search for place predictions (autocomplete)
    * Proxied through Vercel API route
    */
@@ -63,10 +79,13 @@ const GooglePlacesService = (() => {
       }
 
       const data = await response.json();
+      console.log('Raw API response:', data);
       
       // Transform to simpler format - handle both text and structuredFormat
-      return (data.suggestions || []).map(suggestion => {
+      const suggestions = (data.suggestions || []).map(suggestion => {
         const pred = suggestion.placePrediction;
+        if (!pred) return null;
+        
         const structured = pred.structuredFormat;
         
         // Use structuredFormat if available, fallback to text
@@ -80,7 +99,10 @@ const GooglePlacesService = (() => {
           mainText: mainText,
           secondaryText: secondaryText
         };
-      });
+      }).filter(Boolean); // Remove any null entries
+      
+      console.log('Parsed suggestions:', suggestions);
+      return suggestions;
     } catch (error) {
       console.error('Places autocomplete error:', error);
       return [];
@@ -184,28 +206,27 @@ const GooglePlacesService = (() => {
 
       const data = await response.json();
       
-      return (data.suggestions || []).map(suggestion => ({
-        placeId: suggestion.placePrediction.placeId,
-        description: suggestion.placePrediction.text.text,
-        types: suggestion.placePrediction.types || [],
-        mainText: suggestion.placePrediction.text.text.split(',')[0],
-        secondaryText: suggestion.placePrediction.text.text.split(',').slice(1).join(',').trim()
-      }));
+      return (data.suggestions || []).map(suggestion => {
+        const pred = suggestion.placePrediction;
+        if (!pred) return null;
+        
+        const structured = pred.structuredFormat;
+        const mainText = structured?.mainText?.text || pred.text?.text?.split(',')[0] || '';
+        const secondaryText = structured?.secondaryText?.text || 
+                             pred.text?.text?.split(',').slice(1).join(',').trim() || '';
+        
+        return {
+          placeId: pred.placeId || pred.place,
+          description: pred.text?.text || '',
+          types: pred.types || [],
+          mainText: mainText,
+          secondaryText: secondaryText
+        };
+      }).filter(Boolean);
     } catch (error) {
       console.error('Stop places autocomplete error:', error);
       return [];
     }
-  };
-
-  /**
-   * Create a debounced version of a function
-   */
-  const debounce = (func, delay) => {
-    let timeoutId;
-    return (...args) => {
-      clearTimeout(timeoutId);
-      timeoutId = setTimeout(() => func(...args), delay);
-    };
   };
 
   // Public API
@@ -213,6 +234,9 @@ const GooglePlacesService = (() => {
     searchPlaces: debounce(searchPlaces, 300),
     searchStopPlaces: debounce(searchStopPlaces, 300),
     getPlaceDetails,
+    // Export non-debounced versions for testing
+    searchPlacesRaw: searchPlaces,
+    searchStopPlacesRaw: searchStopPlaces,
     // Export debounce utility for other uses
     debounce
   };
@@ -220,4 +244,3 @@ const GooglePlacesService = (() => {
 
 // Make available globally
 window.GooglePlacesService = GooglePlacesService;
-
