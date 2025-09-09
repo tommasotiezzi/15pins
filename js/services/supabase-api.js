@@ -301,8 +301,8 @@ const API = {
     },
 
     /**
-     * NEW METHOD: Get complete draft data for modal/full preview
-     * Everything needed for the trip modal
+     * Get complete draft data for modal/full preview
+     * Used in the creation flow for previewing drafts
      */
     async getFullDraft(draftId) {
       try {
@@ -940,26 +940,66 @@ const API = {
     },
 
     async get(itineraryId) {
-      const { data, error } = await supabase
-        .from('itineraries')
-        .select('*')
-        .eq('id', itineraryId)
-        .single();
-
-      if (data && !error) {
-        // Fetch creator profile separately
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('id, username, avatar_url, bio')
-          .eq('id', data.creator_id)
+      try {
+        // Get the main itinerary data
+        const { data, error } = await supabase
+          .from('itineraries')
+          .select('*')
+          .eq('id', itineraryId)
           .single();
-        
-        if (profile) {
-          data.creator = profile;
-        }
-      }
 
-      return { data, error };
+        if (error || !data) {
+          console.error('Error fetching itinerary:', error);
+          return { data: null, error: error || { message: 'Itinerary not found' } };
+        }
+
+        // Parse the JSONB fields
+        const fullItinerary = {
+          ...data,
+          // Parse days from full_itinerary JSONB
+          days: data.full_itinerary?.days || [],
+          // Parse characteristics from JSONB
+          physical_demand: data.characteristics?.physical_demand || null,
+          cultural_immersion: data.characteristics?.cultural_immersion || null,
+          pace: data.characteristics?.pace || null,
+          budget_level: data.characteristics?.budget_level || null,
+          social_style: data.characteristics?.social_style || null,
+          // Parse essentials from full_itinerary JSONB
+          transportation: data.full_itinerary?.transportation || null,
+          accommodation: data.full_itinerary?.accommodation || null,
+          travel_tips: data.full_itinerary?.travel_tips || null
+        };
+
+        // Sort days and stops
+        if (fullItinerary.days && fullItinerary.days.length > 0) {
+          fullItinerary.days.sort((a, b) => a.day_number - b.day_number);
+          fullItinerary.days.forEach(day => {
+            if (day.stops) {
+              day.stops.sort((a, b) => a.position - b.position);
+            }
+          });
+        }
+
+        // Fetch creator profile separately
+        if (data.creator_id) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('id, username, avatar_url, bio')
+            .eq('id', data.creator_id)
+            .single();
+          
+          if (profile) {
+            fullItinerary.creator = profile;
+          }
+        }
+
+        console.log('API.itineraries.get - Returning full itinerary with parsed JSONB');
+        return { data: fullItinerary, error: null };
+
+      } catch (err) {
+        console.error('Error in itineraries.get:', err);
+        return { data: null, error: err };
+      }
     },
 
     async incrementView(itineraryId) {
