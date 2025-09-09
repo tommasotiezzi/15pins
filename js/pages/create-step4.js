@@ -1,9 +1,11 @@
 /**
  * Create Step 4 - Review & Publish
- * Fixed preview with manual checklist and dynamic colors
+ * Database is the single source of truth - no local storage
  */
 
 const CreateStep4 = (() => {
+  
+  let currentDraftData = null; // Cache for current render
   
   // ============= INITIALIZATION =============
   const init = () => {
@@ -11,33 +13,52 @@ const CreateStep4 = (() => {
     Events.on('action:publish', handlePublish);
     Events.on('action:save-as-draft', handleSaveAsDraft);
     
-    // Navigation - back to build from card/modal goes to step 2
-    Events.on('action:back-to-build', () => {
-      // Close modal if open
-      if (typeof TripModal !== 'undefined') {
-        TripModal.close();
+    // Navigation
+    Events.on('action:back-to-build', handleBackToBuild);
+  };
+
+  // ============= RENDER STEP (ASYNC) =============
+  const render = async () => {
+    const draftId = CreateController.getCurrentDraftId();
+    if (!draftId) {
+      Toast.error('No draft found');
+      return;
+    }
+    
+    try {
+      // Fetch complete draft data from database
+      const { data: draft, error } = await API.drafts.getPreview(draftId);
+      
+      if (error || !draft) {
+        Toast.error('Failed to load draft for preview');
+        return;
       }
-      CreateController.handleStepTransition(4, 2);
-    });
+      
+      // Store for later use
+      currentDraftData = draft;
+      
+      // Get current user
+      const currentUser = await API.auth.getUser();
+      
+      renderPreview(draft, currentUser);
+      
+    } catch (error) {
+      console.error('Error rendering Step 4:', error);
+      Toast.error('Failed to load preview');
+    }
   };
 
   // ============= GET CHECKLIST COLOR CLASS =============
   const getChecklistColorClass = (checkedCount) => {
     if (checkedCount === 0) return 'checklist-red';
     if (checkedCount === 5) return 'checklist-green';
-    return 'checklist-yellow'; // partial completion
+    return 'checklist-yellow';
   };
 
-  // ============= RENDER STEP =============
-  const render = () => {
-    const draft = CreateController.getCurrentDraft();
-    if (!draft) return;
-    
+  // ============= RENDER PREVIEW =============
+  const renderPreview = (draft, currentUser) => {
     const container = document.getElementById('step-4');
     if (!container) return;
-    
-    // Get current user for creator info
-    const currentUser = State.get('currentUser');
     
     container.innerHTML = `
       <div class="review-container">
@@ -173,6 +194,19 @@ const CreateStep4 = (() => {
           background: #e8f5e9 !important;
           border-color: #a5d6a7 !important;
         }
+        
+        .preview-card-wrapper {
+          cursor: pointer;
+        }
+        
+        .itinerary-card-fallback {
+          cursor: pointer;
+          transition: transform 0.2s;
+        }
+        
+        .itinerary-card-fallback:hover {
+          transform: translateY(-4px);
+        }
       </style>
     `;
     
@@ -244,7 +278,7 @@ const CreateStep4 = (() => {
         avatar_url: currentUser?.avatar_url || currentUser?.profile?.avatar_url || 'https://i.pravatar.cc/32',
         bio: currentUser?.bio || currentUser?.profile?.bio || ''
       },
-      context: 'preview' // Important: set context
+      context: 'preview'
     };
     
     // Use ItineraryCard component if available
@@ -258,6 +292,9 @@ const CreateStep4 = (() => {
 
   // ============= FALLBACK CARD RENDER =============
   const renderFallbackCard = (itinerary) => {
+    const totalStops = itinerary.days?.reduce((sum, d) => sum + (d.stops?.length || 0), 0) || 0;
+    const stopsPerDay = itinerary.duration_days > 0 ? Math.round(totalStops / itinerary.duration_days) : 0;
+    
     return `
       <div class="itinerary-card-fallback" data-itinerary-id="preview" data-context="preview">
         <div class="card-image">
@@ -277,8 +314,8 @@ const CreateStep4 = (() => {
           <h3>${itinerary.title}</h3>
           <p class="location">📍 ${itinerary.destination}</p>
           <div class="card-stats">
-            <span>📍 ${itinerary.days?.reduce((sum, d) => sum + (d.stops?.length || 0), 0)} stops</span>
-            <span>⏱️ ${Math.round((itinerary.days?.reduce((sum, d) => sum + (d.stops?.length || 0), 0) / itinerary.duration_days) || 0)}/day</span>
+            <span>📍 ${totalStops} stops</span>
+            <span>⏱️ ${stopsPerDay}/day</span>
           </div>
           <button class="preview-btn">Click to Preview</button>
         </div>
@@ -290,7 +327,6 @@ const CreateStep4 = (() => {
   const setupCardPreview = (draft, currentUser) => {
     // Add a small delay to ensure DOM is ready
     setTimeout(() => {
-      // Setup click handler for the card container
       const cardWrapper = document.querySelector('.preview-card-wrapper');
       if (cardWrapper) {
         cardWrapper.addEventListener('click', (e) => {
@@ -298,9 +334,8 @@ const CreateStep4 = (() => {
           if (e.target.closest('[data-action="back-to-build"]')) return;
           if (e.target.closest('[data-action="wishlist"]')) return;
           
-          // Check if clicking on the card itself or Full Preview button
           const isCard = e.target.closest('.itinerary-card, .itinerary-card-fallback');
-          const isPreviewBtn = e.target.closest('.btn-secondary') || e.target.textContent.includes('Full Preview');
+          const isPreviewBtn = e.target.closest('.btn-secondary') || e.target.textContent.includes('Preview');
           
           if (isCard || isPreviewBtn) {
             e.preventDefault();
@@ -309,21 +344,10 @@ const CreateStep4 = (() => {
           }
         });
       }
-      
-      // Also add direct click handler to fallback card
-      const fallbackCard = document.querySelector('.itinerary-card-fallback');
-      if (fallbackCard) {
-        fallbackCard.style.cursor = 'pointer';
-        fallbackCard.addEventListener('click', (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          openPreviewModal(draft, currentUser);
-        });
-      }
     }, 100);
   };
 
-  // ============= OPEN PREVIEW MODAL (SIMPLIFIED) =============
+  // ============= OPEN PREVIEW MODAL =============
   const openPreviewModal = (draft, currentUser) => {
     if (!draft) {
       console.error('No draft data for preview');
@@ -372,10 +396,19 @@ const CreateStep4 = (() => {
     }
   };
 
+  // ============= NAVIGATION =============
+  const handleBackToBuild = async () => {
+    // Close modal if open
+    if (typeof TripModal !== 'undefined' && TripModal.close) {
+      TripModal.close();
+    }
+    
+    // Navigate back to Step 2 (days builder)
+    await CreateController.navigateToStep(2);
+  };
+
   // ============= HANDLE PUBLISH =============
   const handlePublish = async () => {
-    const draft = CreateController.getCurrentDraft();
-    
     // Check if all checkboxes are checked
     const checkboxes = document.querySelectorAll('.publish-checklist input[type="checkbox"]');
     const allChecked = Array.from(checkboxes).every(cb => cb.checked);
@@ -385,19 +418,24 @@ const CreateStep4 = (() => {
       return;
     }
     
+    if (!currentDraftData) {
+      Toast.error('No draft data available');
+      return;
+    }
+    
     // Confirm publication
     const confirmed = await new Promise(resolve => {
-      if (typeof Modal !== 'undefined') {
+      if (typeof Modal !== 'undefined' && Modal.confirm) {
         Modal.confirm({
           title: '🚀 Ready to Publish?',
-          message: `Your ${draft.duration_days}-day ${draft.destination} itinerary will go live at €${draft.price_tier}. You'll earn €${(draft.price_tier * 0.85).toFixed(2)} per sale.`,
+          message: `Your ${currentDraftData.duration_days}-day ${currentDraftData.destination} itinerary will go live at €${currentDraftData.price_tier}. You'll earn €${(currentDraftData.price_tier * 0.85).toFixed(2)} per sale.`,
           confirmText: 'Publish Now',
           cancelText: 'Review Again',
           onConfirm: () => resolve(true),
           onCancel: () => resolve(false)
         });
       } else {
-        resolve(confirm('Publish your itinerary now?'));
+        resolve(confirm(`Publish your ${currentDraftData.duration_days}-day ${currentDraftData.destination} itinerary for €${currentDraftData.price_tier}?`));
       }
     });
     
@@ -420,10 +458,10 @@ const CreateStep4 = (() => {
       CreateController.hideLoadingOverlay();
       
       // Success message
-      if (typeof Modal !== 'undefined') {
+      if (typeof Modal !== 'undefined' && Modal.alert) {
         Modal.alert({
           title: '🎉 Published Successfully!',
-          message: `Your itinerary is now live! Start earning €${(draft.price_tier * 0.85).toFixed(2)} per sale.`,
+          message: `Your itinerary is now live! Start earning €${(currentDraftData.price_tier * 0.85).toFixed(2)} per sale.`,
           type: 'success',
           buttonText: 'View Dashboard'
         });
@@ -431,12 +469,18 @@ const CreateStep4 = (() => {
         Toast.success('Published successfully!');
       }
       
-      // Clear draft and redirect
-      CreateController.setDraftId(null);
-      CreateController.setDraft(null);
+      // Clear draft ID and URL
+      const url = new URL(window.location);
+      url.searchParams.delete('draft');
+      window.history.replaceState({}, '', url);
       
+      // Redirect to dashboard after a delay
       setTimeout(() => {
-        Router.navigateTo('dashboard');
+        if (typeof Router !== 'undefined' && Router.navigate) {
+          Router.navigate('dashboard');
+        } else {
+          window.location.hash = '#dashboard';
+        }
       }, 2000);
       
     } catch (error) {
@@ -458,6 +502,17 @@ const CreateStep4 = (() => {
       if (draftId) {
         await API.drafts.update(draftId, { current_step: 4 });
         Toast.success('Draft saved');
+        
+        // Update saved indicator
+        const statusEl = document.getElementById('draft-status');
+        if (statusEl) {
+          statusEl.style.display = 'inline-flex';
+          statusEl.textContent = '✓ Saved';
+          statusEl.classList.remove('unsaved');
+          setTimeout(() => {
+            statusEl.style.display = 'none';
+          }, 2000);
+        }
       }
     } catch (error) {
       Toast.error('Failed to save draft');
@@ -475,6 +530,7 @@ const CreateStep4 = (() => {
 
   // ============= VALIDATION =============
   const validateStep = () => {
+    // No validation needed for review step
     return true;
   };
 
