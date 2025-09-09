@@ -384,10 +384,6 @@ const CreateStep1 = (() => {
       const { error } = await API.drafts.saveComplete(draftId, draftData);
       if (error) throw error;
       
-      // Update local state
-      draft.days = draftData.days;
-      CreateController.setDraft(draft);
-      
       Toast.success('Setup saved');
       
       // Navigate to Step 2
