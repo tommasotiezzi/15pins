@@ -988,7 +988,7 @@ const API = {
           added_at,
           itinerary:itineraries(
             *,
-            creator:profiles!itineraries_creator_id_fkey(
+            creator:profiles(
               username,
               avatar_url
             )
