@@ -1,6 +1,6 @@
 /**
  * Create Step 1 - Basic Setup with Google Places Integration
- * Handles initial itinerary setup: title, destination (with Places API), duration, price tier
+ * Database is the single source of truth - no local storage
  */
 
 const CreateStep1 = (() => {
@@ -16,10 +16,7 @@ const CreateStep1 = (() => {
   };
 
   // ============= RENDER STEP =============
-  const render = () => {
-    const draft = CreateController.getCurrentDraft();
-    if (!draft) return;
-    
+  const render = (draft = {}) => {
     populateForm(draft);
     updateCharacterCounts();
     setupDestinationAutocomplete();
@@ -318,9 +315,8 @@ const CreateStep1 = (() => {
     const formData = new FormData(form);
     const data = Object.fromEntries(formData.entries());
     
-    // Get or create draft
+    // Get current draft ID
     let draftId = CreateController.getCurrentDraftId();
-    let draft = CreateController.getCurrentDraft();
     
     if (!draftId) {
       // Create new draft
@@ -331,9 +327,7 @@ const CreateStep1 = (() => {
         if (error) throw error;
         
         draftId = newDraft.id;
-        draft = newDraft;
         CreateController.setDraftId(draftId);
-        CreateController.setDraft(draft);
         
       } catch (error) {
         CreateController.hideLoadingOverlay();
@@ -342,22 +336,6 @@ const CreateStep1 = (() => {
         return;
       }
     }
-    
-    // Update draft with form data including location fields
-    draft.title = data.title;
-    draft.destination = data.destination;
-    draft.duration_days = parseInt(data.duration);
-    draft.description = data.description;
-    draft.price_tier = parseInt(data.product_type);
-    
-    // Add location data
-    draft.place_id = data.place_id;
-    draft.country = data.country;
-    draft.country_code = data.country_code;
-    draft.region = data.region;
-    draft.city = data.city;
-    draft.lat = data.lat ? parseFloat(data.lat) : null;
-    draft.lng = data.lng ? parseFloat(data.lng) : null;
     
     // Save and continue
     try {
@@ -378,7 +356,7 @@ const CreateStep1 = (() => {
         lat: data.lat ? parseFloat(data.lat) : null,
         lng: data.lng ? parseFloat(data.lng) : null,
         current_step: 2,
-        days: draft.days || createDefaultDays(parseInt(data.duration))
+        days: createDefaultDays(parseInt(data.duration))
       };
       
       const { error } = await API.drafts.saveComplete(draftId, draftData);
@@ -499,10 +477,9 @@ const CreateStep1 = (() => {
       
       // Update draft title in real-time for the info bar
       if (e.target.id === 'title') {
-        const draft = CreateController.getCurrentDraft();
-        if (draft) {
-          draft.title = e.target.value;
-          CreateController.updateDraftInfoBar();
+        const titleSpan = document.getElementById('draft-title');
+        if (titleSpan) {
+          titleSpan.textContent = e.target.value || 'Untitled Itinerary';
         }
       }
     });
