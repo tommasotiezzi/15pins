@@ -35,34 +35,52 @@ const CreateStep1 = (() => {
   const setupDestinationAutocomplete = () => {
     const input = document.getElementById('destination');
     const suggestionsDiv = document.getElementById('destination-suggestions');
-    if (!input || !suggestionsDiv) return;
-
-    // Remove any existing listeners
-    input.removeEventListener('input', handleDestinationInput);
-    input.removeEventListener('focus', handleDestinationFocus);
     
-    // Add new listeners
-    input.addEventListener('input', handleDestinationInput);
-    input.addEventListener('focus', handleDestinationFocus);
+    if (!input || !suggestionsDiv) {
+      console.warn('Destination input or suggestions div not found');
+      return;
+    }
+
+    // Remove any existing listeners first
+    const newInput = input.cloneNode(true);
+    input.parentNode.replaceChild(newInput, input);
+    
+    // Add event listener with proper error handling
+    newInput.addEventListener('input', (e) => {
+      try {
+        handleDestinationInput(e);
+      } catch (error) {
+        console.error('Error in destination input handler:', error);
+      }
+    });
+    
+    newInput.addEventListener('focus', handleDestinationFocus);
     
     // Close dropdown when clicking outside
     document.addEventListener('click', (e) => {
       if (!e.target.closest('.destination-input-wrapper')) {
-        suggestionsDiv.classList.remove('active');
+        const suggestions = document.getElementById('destination-suggestions');
+        if (suggestions) suggestions.classList.remove('active');
       }
     });
     
     // Handle keyboard navigation
-    input.addEventListener('keydown', handleDestinationKeydown);
+    newInput.addEventListener('keydown', handleDestinationKeydown);
   };
 
   // ============= HANDLE DESTINATION INPUT =============
   const handleDestinationInput = async (e) => {
-    const query = e.target.value ? e.target.value.trim() : '';
+    if (!e || !e.target) return;
+    
+    const value = e.target.value || '';
+    const query = value.trim();
     const suggestionsDiv = document.getElementById('destination-suggestions');
     
-    if (!query || query.length < 3) {
+    if (!suggestionsDiv) return;
+    
+    if (query.length < 3) {
       suggestionsDiv.classList.remove('active');
+      suggestionsDiv.innerHTML = '';
       currentSuggestions = [];
       return;
     }
@@ -78,9 +96,10 @@ const CreateStep1 = (() => {
         maxSuggestions: 5
       });
       
-      currentSuggestions = suggestions;
+      console.log('Received suggestions:', suggestions);
+      currentSuggestions = suggestions || [];
       
-      if (suggestions.length === 0) {
+      if (!suggestions || suggestions.length === 0) {
         suggestionsDiv.innerHTML = '<div class="autocomplete-no-results">No destinations found</div>';
       } else {
         renderSuggestions(suggestions);
@@ -88,6 +107,7 @@ const CreateStep1 = (() => {
     } catch (error) {
       console.error('Places search error:', error);
       suggestionsDiv.innerHTML = '<div class="autocomplete-no-results">Search failed. Please try again.</div>';
+      currentSuggestions = [];
     }
   };
 
@@ -147,6 +167,13 @@ const CreateStep1 = (() => {
   const renderSuggestions = (suggestions) => {
     const suggestionsDiv = document.getElementById('destination-suggestions');
     
+    if (!suggestionsDiv) {
+      console.error('Suggestions div not found');
+      return;
+    }
+    
+    console.log('Rendering suggestions:', suggestions);
+    
     suggestionsDiv.innerHTML = suggestions.map(suggestion => `
       <div class="autocomplete-suggestion" data-place-id="${suggestion.placeId}">
         <svg class="suggestion-icon" width="20" height="20" fill="none">
@@ -160,6 +187,10 @@ const CreateStep1 = (() => {
         </div>
       </div>
     `).join('');
+    
+    // Make sure the dropdown is visible
+    suggestionsDiv.classList.add('active');
+    console.log('Suggestions div active class added');
     
     // Add click handlers
     suggestionsDiv.querySelectorAll('.autocomplete-suggestion').forEach(el => {
