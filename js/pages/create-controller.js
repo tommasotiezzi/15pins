@@ -8,6 +8,7 @@ const CreateController = (() => {
   let currentDraftId = null;
   let currentStep = 1;
   let loadingOverlay = null;
+  let isSaving = false; // Prevent multiple saves
 
   // ============= INITIALIZATION =============
   const init = () => {
@@ -19,6 +20,14 @@ const CreateController = (() => {
     Events.on('action:continue-draft', continueDraft);
     Events.on('action:delete-draft', deleteDraft);
     Events.on('action:view-drafts', viewDrafts);
+    
+    // Add save draft button handler
+    Events.on('action:save-draft', handleSaveDraft);
+    
+    // Add navigation handlers
+    Events.on('action:go-to-step', handleGoToStep);
+    Events.on('action:previous-step', handlePreviousStep);
+    Events.on('action:next-step', handleNextStep);
     
     // Initialize step modules
     CreateStep1.init();
@@ -111,7 +120,7 @@ const CreateController = (() => {
   };
 
   // ============= START NEW ITINERARY =============
-  const startNewItinerary = () => {
+  const startNewItinerary = async () => {
     // Clear any existing draft ID
     currentDraftId = null;
     currentStep = 1;
@@ -127,8 +136,8 @@ const CreateController = (() => {
     const infoBar = document.getElementById('draft-info-bar');
     if (infoBar) infoBar.style.display = 'none';
     
-    // Render step 1
-    renderStep(1);
+    // Render step 1 with empty state
+    await renderStep(1);
   };
 
   // ============= CONTINUE DRAFT =============
@@ -167,8 +176,13 @@ const CreateController = (() => {
       // Update info bar
       updateDraftInfoBar(draft);
       
+      // Update URL to include draft ID
+      const url = new URL(window.location);
+      url.searchParams.set('draft', draftId);
+      window.history.replaceState({}, '', url);
+      
       // Render the appropriate step
-      renderStep(currentStep);
+      await renderStep(currentStep);
       
     } catch (error) {
       console.error('Error loading draft:', error);
@@ -198,6 +212,11 @@ const CreateController = (() => {
     // If we deleted the current draft, clear it
     if (draftId === currentDraftId) {
       currentDraftId = null;
+      
+      // Clear URL params
+      const url = new URL(window.location);
+      url.searchParams.delete('draft');
+      window.history.replaceState({}, '', url);
     }
     
     // Reload drafts list
@@ -210,11 +229,16 @@ const CreateController = (() => {
     currentDraftId = null;
     currentStep = 1;
     
+    // Clear URL params
+    const url = new URL(window.location);
+    url.searchParams.delete('draft');
+    window.history.replaceState({}, '', url);
+    
     // Show selector
     showDraftSelector();
   };
 
-  // ============= RENDER STEP =============
+  // ============= RENDER STEP (ASYNC) =============
   const renderStep = async (step) => {
     console.log(`Rendering step ${step}`);
     currentStep = step;
@@ -254,23 +278,32 @@ const CreateController = (() => {
         
         if (error || !draft) {
           Toast.error('Failed to load draft data');
+          hideLoadingOverlay();
           return;
         }
         
-        // Pass fresh data to step render
+        // Update info bar with latest data
+        updateDraftInfoBar(draft);
+        
+        // Pass fresh data to step render - AWAIT async renders!
         switch(step) {
           case 1:
             CreateStep1.render(draft);
             break;
           case 2:
-            CreateStep2.render(draft);
+            await CreateStep2.render(draft); // AWAIT!
             break;
           case 3:
-            CreateStep3.render(draft);
+            await CreateStep3.render(draft); // AWAIT if async
             break;
           case 4:
-            CreateStep4.render(draft);
+            await CreateStep4.render(draft); // AWAIT if async
             break;
+        }
+        
+        // Update current step in database if different
+        if (draft.current_step !== step) {
+          await API.drafts.update(currentDraftId, { current_step: step });
         }
         
       } catch (error) {
@@ -281,19 +314,24 @@ const CreateController = (() => {
       }
     } else {
       // New draft - render empty step
-      switch(step) {
-        case 1:
-          CreateStep1.render({});
-          break;
-        case 2:
-          CreateStep2.render({});
-          break;
-        case 3:
-          CreateStep3.render({});
-          break;
-        case 4:
-          CreateStep4.render({});
-          break;
+      try {
+        switch(step) {
+          case 1:
+            CreateStep1.render({});
+            break;
+          case 2:
+            await CreateStep2.render({}); // AWAIT!
+            break;
+          case 3:
+            await CreateStep3.render({}); // AWAIT if async
+            break;
+          case 4:
+            await CreateStep4.render({}); // AWAIT if async
+            break;
+        }
+      } catch (error) {
+        console.error('Error rendering step:', error);
+        Toast.error('Failed to render step');
       }
     }
   };
@@ -309,15 +347,33 @@ const CreateController = (() => {
     if (titleSpan) {
       titleSpan.textContent = draft?.title || 'Untitled Itinerary';
     }
+    
+    // Clear any unsaved indicator
+    const statusEl = document.getElementById('draft-status');
+    if (statusEl) {
+      statusEl.style.display = 'none';
+      statusEl.classList.remove('unsaved');
+    }
   };
 
-  // ============= SAVE CURRENT STEP =============
+  // ============= SAVE HANDLERS =============
+  const handleSaveDraft = async () => {
+    await saveCurrentStep();
+  };
+
   const saveCurrentStep = async () => {
+    // Prevent multiple simultaneous saves
+    if (isSaving) {
+      console.log('Save already in progress');
+      return false;
+    }
+    
     if (!currentDraftId) {
       Toast.error('No draft to save');
       return false;
     }
     
+    isSaving = true;
     showLoadingOverlay('Saving...');
     
     try {
@@ -339,13 +395,14 @@ const CreateController = (() => {
       }
       
       if (success) {
-        Toast.success('Saved');
+        Toast.success('Draft saved');
         
         // Update the saved indicator
         const statusEl = document.getElementById('draft-status');
         if (statusEl) {
           statusEl.style.display = 'inline-flex';
           statusEl.textContent = '✓ Saved';
+          statusEl.classList.remove('unsaved');
           setTimeout(() => {
             statusEl.style.display = 'none';
           }, 2000);
@@ -356,32 +413,62 @@ const CreateController = (() => {
       
     } catch (error) {
       console.error('Save error:', error);
-      Toast.error('Failed to save');
+      Toast.error(error.message || 'Failed to save');
       return false;
     } finally {
       hideLoadingOverlay();
+      isSaving = false;
     }
   };
 
-  // ============= NAVIGATION =============
-  const navigateToStep = async (step) => {
-    // Validate current step before moving
-    let canNavigate = true;
+  // ============= NAVIGATION HANDLERS =============
+  const handleGoToStep = async ({ data }) => {
+    const targetStep = parseInt(data.step);
+    if (!targetStep || targetStep < 1 || targetStep > 4) return;
     
-    switch(currentStep) {
-      case 1:
-        canNavigate = CreateStep1.validateStep();
-        break;
-      case 2:
-        canNavigate = CreateStep2.validateStep();
-        break;
-      case 3:
-        canNavigate = CreateStep3.validateStep();
-        break;
+    await navigateToStep(targetStep);
+  };
+
+  const handlePreviousStep = async () => {
+    if (currentStep > 1) {
+      await navigateToStep(currentStep - 1);
     }
-    
-    if (!canNavigate && step > currentStep) {
-      return false;
+  };
+
+  const handleNextStep = async () => {
+    if (currentStep < 4) {
+      await navigateToStep(currentStep + 1);
+    }
+  };
+
+  const navigateToStep = async (step) => {
+    // Save current step first if moving forward
+    if (step > currentStep) {
+      // Validate current step
+      let canNavigate = true;
+      
+      switch(currentStep) {
+        case 1:
+          canNavigate = CreateStep1.validateStep ? CreateStep1.validateStep() : true;
+          break;
+        case 2:
+          canNavigate = CreateStep2.validateDays ? CreateStep2.validateDays() : true;
+          break;
+        case 3:
+          canNavigate = CreateStep3.validateStep ? CreateStep3.validateStep() : true;
+          break;
+      }
+      
+      if (!canNavigate) {
+        return false;
+      }
+      
+      // Save current step before moving
+      const saved = await saveCurrentStep();
+      if (!saved) {
+        Toast.error('Please save your changes before continuing');
+        return false;
+      }
     }
     
     // Update step in database
@@ -389,7 +476,8 @@ const CreateController = (() => {
       await API.drafts.update(currentDraftId, { current_step: step });
     }
     
-    renderStep(step);
+    // Render the new step
+    await renderStep(step);
     return true;
   };
 
@@ -468,7 +556,7 @@ const CreateController = (() => {
     getCurrentDraftId: () => currentDraftId,
     setDraftId: (id) => { currentDraftId = id; },
     getCurrentStep: () => currentStep,
-    getCurrentDraft,  // Now always fetches from DB
+    getCurrentDraft,
     saveCurrentStep,
     showLoadingOverlay,
     hideLoadingOverlay,
