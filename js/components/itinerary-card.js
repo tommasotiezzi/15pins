@@ -107,20 +107,22 @@ const ItineraryCard = (() => {
    * Render characteristics as subtle badges
    */
   const renderCharacteristics = (itinerary) => {
-    // Try both field names - API might strip 'draft_' prefix
-    const chars = itinerary.characteristics || 
-                  itinerary.draft_characteristics || 
-                  {};
+    // Build characteristics from individual columns (your DB structure)
+    const chars = {
+      physical_demand: itinerary.physical_demand,
+      cultural_immersion: itinerary.cultural_immersion,
+      pace: itinerary.pace,
+      budget_level: itinerary.budget_level,
+      social_style: itinerary.social_style
+    };
     
     console.log('Card received itinerary:', itinerary);
-    console.log('Looking for characteristics, found:', chars);
-    console.log('Characteristics keys:', Object.keys(chars));
-    console.log('Characteristics values:', Object.entries(chars));
+    console.log('Built characteristics from columns:', chars);
     
-    // Check if characteristics is empty or has no actual values
-    const hasValidCharacteristics = chars && 
-      Object.keys(chars).length > 0 && 
-      Object.keys(chars).some(key => chars[key] !== null && chars[key] !== undefined);
+    // Check if any characteristics are set
+    const hasValidCharacteristics = Object.values(chars).some(value => 
+      value !== null && value !== undefined && value > 0
+    );
     
     if (!hasValidCharacteristics) {
       return '<div class="card-characteristics-empty">No characteristics set</div>';
@@ -137,20 +139,19 @@ const ItineraryCard = (() => {
     const badges = specs
       .filter(spec => {
         const value = chars[spec.key];
-        console.log(`Checking ${spec.key}: value=${value}, type=${typeof value}`);
         return value !== null && value !== undefined && value > 0;
       })
       .map(spec => {
         const value = parseInt(chars[spec.key]);
-        console.log(`Creating badge for ${spec.key}: ${value} -> ${spec.labels[value - 1]}`);
+        // The value is 1-5, so we use value-1 as array index
+        const label = spec.labels[value - 1] || 'Unknown';
+        console.log(`${spec.key}: value=${value}, label=${label}`);
         return `
           <span class="char-badge">
-            ${spec.icon} ${spec.labels[value - 1] || 'Unknown'}
+            ${spec.icon} ${label}
           </span>
         `;
       });
-    
-    console.log('Created badges:', badges);
     
     return badges.length > 0 ? 
       `<div class="card-characteristics-subtle">${badges.join('')}</div>` : 
