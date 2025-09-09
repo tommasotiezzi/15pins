@@ -246,6 +246,8 @@ async getPreview(draftId) {
     }
     
     if (data) {
+      console.log('Raw data from Supabase:', data);
+      console.log('draft_characteristics array:', data.draft_characteristics);
       // Sort days and stops
       if (data.draft_days) {
         data.draft_days.sort((a, b) => a.day_number - b.day_number);
