@@ -304,7 +304,7 @@ const CreateStep4 = (() => {
     // Create itinerary preview with ALL draft fields including characteristic columns
     const itineraryPreview = {
       ...draft, // Spread ALL draft fields first (includes characteristic columns)
-      id: 'preview',
+      id: draft.id || draftId, 
       title: draft.title || 'Untitled Itinerary',
       destination: draft.destination || 'Unknown',
       duration_days: draft.duration_days || 0,
@@ -341,10 +341,7 @@ const CreateStep4 = (() => {
       social_style: itineraryPreview.social_style
     });
     
-    // Store for modal access
-    window.CreatePage = window.CreatePage || {};
-    window.CreatePage.getCurrentDraft = () => itineraryPreview;
-    
+
     // Use ItineraryCard component if available
     if (typeof ItineraryCard !== 'undefined') {
       return ItineraryCard.create(itineraryPreview, 'preview');

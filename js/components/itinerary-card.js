@@ -1,24 +1,30 @@
 /**
  * Itinerary Card Component
- * Displays itinerary summary cards with characteristics
- * Self-contained - fetches its own data when needed
+ * Self-contained component that always fetches its own data
  * Place in: js/components/itinerary-card.js
  */
 
 const ItineraryCard = (() => {
+  
   /**
    * Create an itinerary card HTML
-   * @param {Object} itinerary - The itinerary data from database
+   * @param {Object} itinerary - The itinerary data with characteristics as DB columns
    * @param {String} context - 'feed', 'preview', 'dashboard'
    * @returns {String} HTML string for the card
    */
   const create = (itinerary, context = 'feed') => {
-    // Calculate stats from the data
+    // Validate data
+    if (!itinerary) {
+      return '<div class="error-card">Invalid itinerary data</div>';
+    }
+    
+    // Calculate stats
     const stats = calculateStats(itinerary);
     
+    // Build card HTML
     return `
       <div class="itinerary-card enhanced" 
-           data-itinerary-id="${itinerary.id || 'preview'}"
+           data-itinerary-id="${itinerary.id}"
            data-context="${context}">
         
         ${renderCardImage(itinerary)}
@@ -32,31 +38,32 @@ const ItineraryCard = (() => {
       </div>
     `;
   };
-
+  
   /**
    * Calculate statistics from itinerary data
    */
   const calculateStats = (itinerary) => {
     let totalStops = 0;
     
-    // Handle both draft format and regular format
-    if (itinerary.days) {
+    if (itinerary.days && Array.isArray(itinerary.days)) {
       itinerary.days.forEach(day => {
-        if (day.stops) {
+        if (day.stops && Array.isArray(day.stops)) {
           totalStops += day.stops.length;
         }
       });
     }
     
+    const avgStopsPerDay = itinerary.duration_days > 0 ? 
+      Math.round(totalStops / itinerary.duration_days) : 0;
+    
     return {
       totalStops,
-      avgStopsPerDay: itinerary.duration_days ? 
-        Math.round(totalStops / itinerary.duration_days) : 0
+      avgStopsPerDay
     };
   };
-
+  
   /**
-   * Render card image with badges
+   * Render card image section with badges
    */
   const renderCardImage = (itinerary) => {
     const price = itinerary.price_tier || itinerary.price || 9;
@@ -65,7 +72,10 @@ const ItineraryCard = (() => {
     return `
       <div class="card-image-enhanced">
         ${itinerary.cover_image_url ? 
-          `<img src="${itinerary.cover_image_url}" alt="${itinerary.title}" loading="lazy">` :
+          `<img src="${itinerary.cover_image_url}" 
+                alt="${itinerary.title}" 
+                loading="lazy"
+                onerror="this.parentElement.innerHTML='<div class=\\'card-image-placeholder\\'><svg width=\\'60\\' height=\\'60\\' fill=\\'none\\' opacity=\\'0.3\\'><path d=\\'M30 15C23 15 17 21 17 28C17 35 30 50 30 50C30 50 43 35 43 28C43 21 37 15 30 15Z\\' stroke=\\'currentColor\\' stroke-width=\\'2\\'/></svg></div>'">` :
           `<div class="card-image-placeholder">
             <svg width="60" height="60" fill="none" opacity="0.3">
               <path d="M30 15C23 15 17 21 17 28C17 35 30 50 30 50C30 50 43 35 43 28C43 21 37 15 30 15Z" 
@@ -74,7 +84,7 @@ const ItineraryCard = (() => {
           </div>`
         }
         <div class="card-badges-overlay">
-          <span class="card-badge-duration">📅 ${itinerary.duration_days} days</span>
+          <span class="card-badge-duration">📅 ${itinerary.duration_days || 0} days</span>
           <span class="card-badge-price tier-${tierLabel.toLowerCase()}">
             €${price}
             <span class="tier-label">${tierLabel}</span>
@@ -83,9 +93,9 @@ const ItineraryCard = (() => {
       </div>
     `;
   };
-
+  
   /**
-   * Render card header
+   * Render card header with title and location
    */
   const renderCardHeader = (itinerary) => {
     return `
@@ -103,52 +113,69 @@ const ItineraryCard = (() => {
       </div>
     `;
   };
-
+  
   /**
-   * Render characteristics as subtle badges
-   * Reads directly from the database columns
+   * Render characteristics badges
+   * Reads from database columns: physical_demand, cultural_immersion, pace, budget_level, social_style
    */
   const renderCharacteristics = (itinerary) => {
-    // These come directly from the database columns
     const specs = [
-      { key: 'physical_demand', icon: '💪', labels: ['V.Easy', 'Easy', 'Moderate', 'Active', 'Hard'] },
-      { key: 'cultural_immersion', icon: '🌍', labels: ['Tourist', 'Mixed', 'Balanced', 'Local', 'Immersive'] },
-      { key: 'pace', icon: '⚡', labels: ['V.Slow', 'Relaxed', 'Moderate', 'Fast', 'Packed'] },
-      { key: 'budget_level', icon: '💰', labels: ['Budget', 'Economy', 'Mid', 'Upscale', 'Luxury'] },
-      { key: 'social_style', icon: '👥', labels: ['Solo', 'Couples', 'Friends', 'Family', 'Groups'] }
+      { 
+        key: 'physical_demand', 
+        icon: '💪', 
+        labels: ['V.Easy', 'Easy', 'Moderate', 'Active', 'Hard'] 
+      },
+      { 
+        key: 'cultural_immersion', 
+        icon: '🌍', 
+        labels: ['Tourist', 'Mixed', 'Balanced', 'Local', 'Immersive'] 
+      },
+      { 
+        key: 'pace', 
+        icon: '⚡', 
+        labels: ['V.Slow', 'Relaxed', 'Moderate', 'Fast', 'Packed'] 
+      },
+      { 
+        key: 'budget_level', 
+        icon: '💰', 
+        labels: ['Budget', 'Economy', 'Mid', 'Upscale', 'Luxury'] 
+      },
+      { 
+        key: 'social_style', 
+        icon: '👥', 
+        labels: ['Solo', 'Couples', 'Friends', 'Family', 'Groups'] 
+      }
     ];
     
-    // Check if any characteristics are set
-    const hasValidCharacteristics = specs.some(spec => {
+    // Build badges for characteristics that have values
+    const badges = [];
+    
+    specs.forEach(spec => {
       const value = itinerary[spec.key];
-      return value !== null && value !== undefined && value > 0;
+      
+      // Check if value exists and is valid (1-5)
+      if (value && value >= 1 && value <= 5) {
+        const labelIndex = parseInt(value) - 1;
+        const label = spec.labels[labelIndex];
+        
+        if (label) {
+          badges.push(`
+            <span class="char-badge">
+              ${spec.icon} ${label}
+            </span>
+          `);
+        }
+      }
     });
     
-    if (!hasValidCharacteristics) {
+    // Return badges or empty state
+    if (badges.length > 0) {
+      return `<div class="card-characteristics-subtle">${badges.join('')}</div>`;
+    } else {
       return '<div class="card-characteristics-empty">No characteristics set</div>';
     }
-    
-    const badges = specs
-      .filter(spec => {
-        const value = itinerary[spec.key];
-        return value !== null && value !== undefined && value > 0;
-      })
-      .map(spec => {
-        const value = parseInt(itinerary[spec.key]);
-        // The value is 1-5, so we use value-1 as array index
-        const label = spec.labels[value - 1] || 'Unknown';
-        return `
-          <span class="char-badge">
-            ${spec.icon} ${label}
-          </span>
-        `;
-      });
-    
-    return badges.length > 0 ? 
-      `<div class="card-characteristics-subtle">${badges.join('')}</div>` : 
-      '<div class="card-characteristics-empty">No characteristics set</div>';
   };
-
+  
   /**
    * Render card statistics
    */
@@ -165,7 +192,7 @@ const ItineraryCard = (() => {
           <span class="stat-value">${stats.avgStopsPerDay}</span>
           <span class="stat-label">per day</span>
         </div>
-        ${itinerary.total_sales ? `
+        ${itinerary.total_sales > 0 ? `
           <div class="stat-item">
             <span class="stat-icon">⭐</span>
             <span class="stat-value">${itinerary.total_sales}</span>
@@ -175,7 +202,7 @@ const ItineraryCard = (() => {
       </div>
     `;
   };
-
+  
   /**
    * Render card footer based on context
    */
@@ -204,77 +231,92 @@ const ItineraryCard = (() => {
         </div>
       `;
     } else {
-      // Feed context - show creator info
+      // Feed context
       return `
         <div class="card-footer-enhanced">
           ${itinerary.creator ? `
             <div class="creator-info-enhanced">
               <img src="${itinerary.creator.avatar_url || '/images/default-avatar.png'}" 
-                   alt="${itinerary.creator.username}" 
+                   alt="${itinerary.creator.username || 'Creator'}" 
                    class="creator-avatar-small"
                    onerror="this.src='/images/default-avatar.png'">
-              <span class="creator-name">${itinerary.creator.username}</span>
+              <span class="creator-name">${itinerary.creator.username || 'Anonymous'}</span>
             </div>
           ` : ''}
-          <button class="wishlist-btn" data-action="wishlist" data-id="${itinerary.id}">
-            ❤️
+          <button class="wishlist-btn ${itinerary.is_wishlisted ? 'active' : ''}" 
+                  data-action="wishlist" 
+                  data-id="${itinerary.id}">
+            ${itinerary.is_wishlisted ? '❤️' : '🤍'}
           </button>
         </div>
       `;
     }
   };
-
+  
   /**
-   * Open modal - fetches fresh data every time
-   * This ensures we always have the latest characteristics from DB
+   * Open modal with itinerary data
+   * Always fetches fresh data from API
    */
   const openModal = async (itineraryId, context) => {
+    if (!itineraryId) {
+      console.error('No itinerary ID provided');
+      return;
+    }
+    
     try {
-      // Always fetch fresh data from the API
-      // This ensures we get the characteristics columns from the database
-      const response = await API.itineraries.get(itineraryId);
+      // Always fetch fresh data
+      // Use drafts API for draft itineraries, regular API for published
+      const response = context === 'preview' ? 
+        await API.drafts.getPreview(itineraryId) :
+        await API.itineraries.get(itineraryId);
       
       if (response.error || !response.data) {
+        console.error('Failed to load itinerary:', response.error);
         Toast.error('Failed to load itinerary');
         return;
       }
       
       const itinerary = response.data;
       
-      // The API should return the itinerary with all columns including:
-      // physical_demand, cultural_immersion, pace, budget_level, social_style
-      console.log('Fetched itinerary from API:', itinerary);
+      console.log('Opening modal with itinerary:', itinerary);
       
-      // Emit event to open modal with fresh data
+      // Emit event to open modal
       Events.emit('trip-modal:open', { 
         itinerary, 
         context 
       });
+      
     } catch (error) {
       console.error('Error opening modal:', error);
       Toast.error('Failed to open itinerary');
     }
   };
-
+  
   /**
    * Toggle wishlist status
    */
   const toggleWishlist = async (itineraryId) => {
+    if (!itineraryId) return;
+    
     try {
       const response = await API.wishlists.toggle(itineraryId);
+      
       if (response.success) {
-        // Update UI to reflect wishlist status
+        // Update button UI
         const button = document.querySelector(`[data-action="wishlist"][data-id="${itineraryId}"]`);
         if (button) {
           button.classList.toggle('active');
+          button.textContent = button.classList.contains('active') ? '❤️' : '🤍';
         }
+        
+        Toast.success(response.is_wishlisted ? 'Added to wishlist' : 'Removed from wishlist');
       }
     } catch (error) {
       console.error('Error toggling wishlist:', error);
       Toast.error('Failed to update wishlist');
     }
   };
-
+  
   /**
    * Render multiple cards as a grid
    */
@@ -290,88 +332,95 @@ const ItineraryCard = (() => {
     
     return `
       <div class="itinerary-cards-grid">
-        ${itineraries.map(it => create(it, context)).join('')}
+        ${itineraries.map(itinerary => create(itinerary, context)).join('')}
       </div>
     `;
   };
-
+  
   /**
-   * Create a preview card for Step 4
-   * This fetches the saved draft from the API to ensure we have characteristics
-   */
-  const createPreviewCard = async (itineraryId) => {
-    try {
-      // Fetch the draft itinerary with its characteristics
-      const response = await API.itineraries.get(itineraryId);
-      
-      if (response.error || !response.data) {
-        console.error('Failed to load draft for preview');
-        return '<div class="error">Failed to load preview</div>';
-      }
-      
-      // Create the card with the fetched data
-      return create(response.data, 'preview');
-    } catch (error) {
-      console.error('Error creating preview card:', error);
-      return '<div class="error">Failed to create preview</div>';
-    }
-  };
-
-  /**
-   * Initialize component
+   * Initialize component and set up event listeners
    */
   const init = () => {
     console.log('ItineraryCard component initialized');
     
-    // Set up delegated event listeners
-    document.addEventListener('click', (e) => {
-      // Handle card clicks
-      const card = e.target.closest('.itinerary-card.enhanced');
-      if (card && !e.target.closest('button')) {
-        const id = card.dataset.itineraryId;
-        const context = card.dataset.context;
-        if (id && id !== 'preview') {
-          openModal(id, context);
-        }
-        return;
-      }
-      
-      // Handle preview modal button
-      if (e.target.closest('[data-action="preview-modal"]')) {
-        e.stopPropagation();
-        const card = e.target.closest('.itinerary-card');
-        const id = card?.dataset.itineraryId;
-        if (id && id !== 'preview') {
-          openModal(id, 'preview');
-        }
-        return;
-      }
-      
-      // Handle continue editing button
-      if (e.target.closest('[data-action="back-to-build"]')) {
-        e.stopPropagation();
-        Events.emit('action:back-to-build');
-        return;
-      }
-      
-      // Handle wishlist button
-      if (e.target.closest('[data-action="wishlist"]')) {
-        e.stopPropagation();
-        const button = e.target.closest('[data-action="wishlist"]');
-        const id = button.dataset.id;
-        if (id) {
-          toggleWishlist(id);
-        }
-        return;
-      }
-    });
+    // Event delegation for all card interactions
+    document.addEventListener('click', handleCardClick);
   };
-
+  
+  /**
+   * Handle all card click events
+   */
+  const handleCardClick = (e) => {
+    // Preview modal button
+    if (e.target.closest('[data-action="preview-modal"]')) {
+      e.preventDefault();
+      e.stopPropagation();
+      
+      const card = e.target.closest('.itinerary-card');
+      const id = card?.dataset.itineraryId;
+      
+      if (id) {
+        openModal(id, 'preview');
+      }
+      return;
+    }
+    
+    // Back to build button
+    if (e.target.closest('[data-action="back-to-build"]')) {
+      e.preventDefault();
+      e.stopPropagation();
+      
+      Events.emit('action:back-to-build');
+      return;
+    }
+    
+    // Wishlist button
+    if (e.target.closest('[data-action="wishlist"]')) {
+      e.preventDefault();
+      e.stopPropagation();
+      
+      const button = e.target.closest('[data-action="wishlist"]');
+      const id = button.dataset.id;
+      
+      if (id) {
+        toggleWishlist(id);
+      }
+      return;
+    }
+    
+    // Edit button (dashboard)
+    if (e.target.closest('[data-action="edit-itinerary"]')) {
+      e.preventDefault();
+      e.stopPropagation();
+      
+      const button = e.target.closest('[data-action="edit-itinerary"]');
+      const id = button.dataset.id;
+      
+      if (id) {
+        // Navigate to edit page
+        window.location.href = `#create?draft=${id}`;
+      }
+      return;
+    }
+    
+    // Card click (open modal)
+    const card = e.target.closest('.itinerary-card.enhanced');
+    if (card && !e.target.closest('button')) {
+      e.preventDefault();
+      
+      const id = card.dataset.itineraryId;
+      const context = card.dataset.context || 'feed';
+      
+      if (id) {
+        openModal(id, context);
+      }
+    }
+  };
+  
   // Public API
   return {
     create,
     renderCards,
-    createPreviewCard,
     openModal,
     toggleWishlist,
     init
@@ -379,7 +428,11 @@ const ItineraryCard = (() => {
 })();
 
 // Initialize when DOM is ready
-document.addEventListener('DOMContentLoaded', ItineraryCard.init);
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', ItineraryCard.init);
+} else {
+  ItineraryCard.init();
+}
 
 // Make available globally
 window.ItineraryCard = ItineraryCard;
