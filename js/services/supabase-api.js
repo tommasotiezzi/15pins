@@ -914,8 +914,34 @@ const API = {
 
       const { data, error } = await query;
       
-      // Add creator info manually if needed
+      // Process the data to parse JSONB fields and calculate stats
       if (data && data.length > 0) {
+        // Parse JSONB fields and calculate stats for each itinerary
+        data.forEach(item => {
+          // Parse characteristics from JSONB to flat fields
+          if (item.characteristics) {
+            item.physical_demand = item.characteristics.physical_demand || null;
+            item.cultural_immersion = item.characteristics.cultural_immersion || null;
+            item.pace = item.characteristics.pace || null;
+            item.budget_level = item.characteristics.budget_level || null;
+            item.social_style = item.characteristics.social_style || null;
+          }
+          
+          // Calculate stop counts from full_itinerary JSONB
+          let totalStops = 0;
+          if (item.full_itinerary && item.full_itinerary.days) {
+            item.full_itinerary.days.forEach(day => {
+              if (day.stops && Array.isArray(day.stops)) {
+                totalStops += day.stops.length;
+              }
+            });
+          }
+          
+          // Add calculated stats for the card
+          item.total_stops = totalStops;
+          item.stops_per_day = item.duration_days > 0 ? Math.round(totalStops / item.duration_days) : 0;
+        });
+        
         // Fetch creator profiles separately
         const creatorIds = [...new Set(data.map(item => item.creator_id))];
         const { data: profiles } = await supabase
