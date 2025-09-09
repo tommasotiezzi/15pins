@@ -1,6 +1,6 @@
 /**
  * Vercel API Route: /api/places/autocomplete.js
- * Proxies autocomplete requests to Google Places API
+ * Proxies autocomplete requests to Google Places API (New)
  */
 
 export default async function handler(req, res) {
@@ -36,41 +36,39 @@ export default async function handler(req, res) {
   }
 
   try {
+    // Build request body according to NEW API format
     const requestBody = {
-      input,
-      sessionToken,
-      includedPrimaryTypes: types,
-      languageCode: language || 'en'
+      input: input
     };
 
-    // Add optional fields if provided
+    // Add optional session token
+    if (sessionToken) {
+      requestBody.sessionToken = sessionToken;
+    }
+
+    // Add types for filtering (corrected field name)
+    if (types && types.length > 0) {
+      requestBody.includedPrimaryTypes = types;
+    }
+
+    // Add language code if specified
+    if (language) {
+      requestBody.languageCode = language;
+    }
+
+    // Add region codes if specified
     if (regionCodes && regionCodes.length > 0) {
       requestBody.includedRegionCodes = regionCodes;
     }
-    
-    if (maxSuggestions) {
-      requestBody.maxSuggestions = maxSuggestions;
-    }
 
-    // Add location bias if provided (for stop searches)
-    if (locationBias) {
-      requestBody.locationBias = {
-        circle: {
-          center: {
-            latitude: locationBias.lat,
-            longitude: locationBias.lng
-          },
-          radius: locationBias.radius || 50000 // 50km default radius
-        }
-      };
-    }
+    console.log('Request to Google Places API:', JSON.stringify(requestBody, null, 2));
 
     const response = await fetch('https://places.googleapis.com/v1/places:autocomplete', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'X-Goog-Api-Key': process.env.GOOGLE_PLACES_API,
-        'X-Goog-FieldMask': 'suggestions.placePrediction.place,suggestions.placePrediction.placeId,suggestions.placePrediction.text,suggestions.placePrediction.types'
+        'X-Goog-FieldMask': 'suggestions.placePrediction.place,suggestions.placePrediction.placeId,suggestions.placePrediction.text,suggestions.placePrediction.structuredFormat,suggestions.placePrediction.types'
       },
       body: JSON.stringify(requestBody)
     });

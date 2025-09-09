@@ -64,13 +64,23 @@ const GooglePlacesService = (() => {
 
       const data = await response.json();
       
-      // Transform to simpler format
-      return (data.suggestions || []).map(suggestion => ({
-        placeId: suggestion.placePrediction.placeId,
-        description: suggestion.placePrediction.text.text,
-        mainText: suggestion.placePrediction.text.text.split(',')[0],
-        secondaryText: suggestion.placePrediction.text.text.split(',').slice(1).join(',').trim()
-      }));
+      // Transform to simpler format - handle both text and structuredFormat
+      return (data.suggestions || []).map(suggestion => {
+        const pred = suggestion.placePrediction;
+        const structured = pred.structuredFormat;
+        
+        // Use structuredFormat if available, fallback to text
+        const mainText = structured?.mainText?.text || pred.text?.text?.split(',')[0] || '';
+        const secondaryText = structured?.secondaryText?.text || 
+                             pred.text?.text?.split(',').slice(1).join(',').trim() || '';
+        
+        return {
+          placeId: pred.placeId || pred.place,
+          description: pred.text?.text || '',
+          mainText: mainText,
+          secondaryText: secondaryText
+        };
+      });
     } catch (error) {
       console.error('Places autocomplete error:', error);
       return [];
@@ -210,3 +220,4 @@ const GooglePlacesService = (() => {
 
 // Make available globally
 window.GooglePlacesService = GooglePlacesService;
+
