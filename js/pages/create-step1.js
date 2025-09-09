@@ -17,6 +17,39 @@ const CreateStep1 = (() => {
 
   // ============= RENDER STEP =============
   const render = (draft = {}) => {
+    // IMPORTANT: Reset local UI state when rendering
+    // This prevents data from bleeding between different drafts
+    if (!draft.place_id) {
+      // This is either a new draft or one without a destination selected
+      selectedPlace = null;
+      currentSuggestions = [];
+      
+      // Clear any visible UI elements that might be leftover
+      const selectedDiv = document.getElementById('selected-destination');
+      if (selectedDiv) {
+        selectedDiv.style.display = 'none';
+      }
+      
+      // Clear all hidden fields explicitly
+      const hiddenFields = ['place_id', 'country', 'country_code', 'region', 'city', 'lat', 'lng'];
+      hiddenFields.forEach(fieldId => {
+        const field = document.getElementById(fieldId);
+        if (field) field.value = '';
+      });
+    } else {
+      // Draft has a place_id, restore selectedPlace from draft data
+      selectedPlace = {
+        placeId: draft.place_id,
+        country: draft.country,
+        countryCode: draft.country_code,
+        region: draft.region,
+        city: draft.city,
+        lat: draft.lat,
+        lng: draft.lng,
+        displayName: draft.city || draft.destination
+      };
+    }
+    
     populateForm(draft);
     updateCharacterCounts();
     setupDestinationAutocomplete();
@@ -38,7 +71,7 @@ const CreateStep1 = (() => {
       return;
     }
 
-    // Remove any existing listeners first
+    // Remove any existing listeners first (prevents duplicate handlers)
     const newInput = input.cloneNode(true);
     input.parentNode.replaceChild(newInput, input);
     
@@ -57,7 +90,10 @@ const CreateStep1 = (() => {
     document.addEventListener('click', (e) => {
       if (!e.target.closest('.destination-input-wrapper')) {
         const suggestions = document.getElementById('destination-suggestions');
-        if (suggestions) suggestions.classList.remove('active');
+        if (suggestions) {
+          suggestions.classList.remove('active');
+          suggestions.innerHTML = '';
+        }
       }
     });
     
@@ -113,6 +149,7 @@ const CreateStep1 = (() => {
     const suggestionsDiv = document.getElementById('destination-suggestions');
     if (currentSuggestions.length > 0) {
       suggestionsDiv.classList.add('active');
+      renderSuggestions(currentSuggestions);
     }
   };
 
@@ -156,6 +193,7 @@ const CreateStep1 = (() => {
         break;
       case 'Escape':
         suggestionsDiv.classList.remove('active');
+        suggestionsDiv.innerHTML = '';
         break;
     }
   };
@@ -215,6 +253,7 @@ const CreateStep1 = (() => {
     
     // Hide suggestions
     suggestionsDiv.classList.remove('active');
+    suggestionsDiv.innerHTML = '';
     
     // Show loading state
     input.disabled = true;
@@ -258,6 +297,7 @@ const CreateStep1 = (() => {
   // ============= CLEAR DESTINATION =============
   const handleClearDestination = () => {
     selectedPlace = null;
+    currentSuggestions = [];
     
     // Clear visible elements
     document.getElementById('destination').value = '';
@@ -271,6 +311,13 @@ const CreateStep1 = (() => {
     document.getElementById('city').value = '';
     document.getElementById('lat').value = '';
     document.getElementById('lng').value = '';
+    
+    // Clear suggestions
+    const suggestionsDiv = document.getElementById('destination-suggestions');
+    if (suggestionsDiv) {
+      suggestionsDiv.classList.remove('active');
+      suggestionsDiv.innerHTML = '';
+    }
     
     // Focus back on input
     document.getElementById('destination').focus();
@@ -429,15 +476,24 @@ const CreateStep1 = (() => {
     const form = document.getElementById('setup-form');
     if (!form) return;
     
+    // Clear form first to ensure clean state
+    form.reset();
+    
     // Basic fields
     if (form.title) form.title.value = draft.title || '';
     if (form.destination) form.destination.value = draft.destination || '';
     if (form.duration) form.duration.value = draft.duration_days || '';
     if (form.description) form.description.value = draft.description || '';
     
-    // Price tier
-    const priceRadio = form.querySelector(`input[name="product_type"][value="${draft.price_tier}"]`);
-    if (priceRadio) priceRadio.checked = true;
+    // Price tier - default to 9 if not set
+    if (draft.price_tier) {
+      const priceRadio = form.querySelector(`input[name="product_type"][value="${draft.price_tier}"]`);
+      if (priceRadio) priceRadio.checked = true;
+    } else {
+      // Default to €9 tier for new drafts
+      const defaultRadio = form.querySelector(`input[name="product_type"][value="9"]`);
+      if (defaultRadio) defaultRadio.checked = true;
+    }
     
     // Populate location fields if they exist
     if (draft.place_id) {
@@ -456,22 +512,16 @@ const CreateStep1 = (() => {
         const flagEmoji = getFlagEmoji(draft.country_code);
         displaySpan.textContent = `${flagEmoji} ${draft.city || draft.destination}, ${draft.country}`;
         selectedDiv.style.display = 'block';
-        
-        // Store as selected place
-        selectedPlace = {
-          placeId: draft.place_id,
-          country: draft.country,
-          countryCode: draft.country_code,
-          region: draft.region,
-          city: draft.city,
-          lat: draft.lat,
-          lng: draft.lng
-        };
       }
     }
     
-    // Add change listeners
-    form.addEventListener('input', (e) => {
+    // Remove any existing event listeners to prevent duplicates
+    const existingForm = document.getElementById('setup-form');
+    const newForm = existingForm.cloneNode(true);
+    existingForm.parentNode.replaceChild(newForm, existingForm);
+    
+    // Add change listeners to the new form
+    newForm.addEventListener('input', (e) => {
       CreateController.markAsUnsaved();
       updateCharacterCounts();
       
