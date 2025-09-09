@@ -271,42 +271,16 @@ const ItineraryCard = (() => {
       return;
     }
     
-    console.log('Opening modal for ID:', itineraryId, 'Context:', context);
+    console.log('🔴 Opening modal for ID:', itineraryId);
+    console.log('Context:', context);
     
     try {
-      let response;
+      // Use the new API methods
+      const response = context === 'preview' ? 
+        await API.drafts.getFullDraft(itineraryId) :  // NEW METHOD for drafts
+        await API.itineraries.get(itineraryId);        // Existing method for published
       
-      if (context === 'preview') {
-        // For draft preview, use the draft API
-        response = await API.drafts.getFullDraft(itineraryId);
-      } else {
-        // For published itineraries, fetch the full data
-        response = await API.itineraries.get(itineraryId);
-        
-        // If successful and we need more data for modal
-        if (response.data && !response.error) {
-          // Check if days data exists, if not fetch it
-          if (!response.data.days) {
-            const { data: days } = await supabase
-              .from('itinerary_days')
-              .select(`
-                *,
-                stops:itinerary_stops(*)
-              `)
-              .eq('itinerary_id', itineraryId)
-              .order('day_number');
-            
-            if (days) {
-              days.forEach(day => {
-                if (day.stops) {
-                  day.stops.sort((a, b) => a.position - b.position);
-                }
-              });
-              response.data.days = days;
-            }
-          }
-        }
-      }
+      console.log('Modal data fetched:', response);
       
       if (response.error || !response.data) {
         console.error('Failed to load itinerary:', response.error);
@@ -316,13 +290,11 @@ const ItineraryCard = (() => {
       
       const itinerary = response.data;
       
-      // Open the modal using TripModal
-      if (typeof TripModal !== 'undefined' && TripModal.open) {
-        TripModal.open(itinerary, context);
-      } else {
-        console.error('TripModal component not found');
-        Toast.error('Unable to open itinerary details');
-      }
+      // Emit event to open modal
+      Events.emit('trip-modal:open', { 
+        itinerary, 
+        context 
+      });
       
     } catch (error) {
       console.error('Error opening modal:', error);
@@ -337,38 +309,17 @@ const ItineraryCard = (() => {
     if (!itineraryId) return;
     
     try {
-      // Check if API method exists
-      if (API.wishlist && API.wishlist.toggle) {
-        const response = await API.wishlist.toggle(itineraryId);
-        
-        if (response.success) {
-          // Update button UI
-          const button = document.querySelector(`[data-action="wishlist"][data-id="${itineraryId}"]`);
-          if (button) {
-            button.classList.toggle('active');
-            button.textContent = button.classList.contains('active') ? '❤️' : '🤍';
-          }
-          
-          Toast.success(response.is_wishlisted ? 'Added to wishlist' : 'Removed from wishlist');
-        }
-      } else {
-        // Fallback: check current state and call add/remove
-        const { data: isWishlisted } = await API.wishlist.check(itineraryId);
-        
-        if (isWishlisted) {
-          await API.wishlist.remove(itineraryId);
-          Toast.success('Removed from wishlist');
-        } else {
-          await API.wishlist.add(itineraryId);
-          Toast.success('Added to wishlist');
-        }
-        
-        // Update UI
+      const response = await API.wishlists.toggle(itineraryId);
+      
+      if (response.success) {
+        // Update button UI
         const button = document.querySelector(`[data-action="wishlist"][data-id="${itineraryId}"]`);
         if (button) {
           button.classList.toggle('active');
           button.textContent = button.classList.contains('active') ? '❤️' : '🤍';
         }
+        
+        Toast.success(response.is_wishlisted ? 'Added to wishlist' : 'Removed from wishlist');
       }
     } catch (error) {
       console.error('Error toggling wishlist:', error);
@@ -410,12 +361,10 @@ const ItineraryCard = (() => {
    * Handle all card click events
    */
   const handleCardClick = (e) => {
-    // Stop propagation to prevent multiple triggers
-    e.stopPropagation();
-    
     // Preview modal button
     if (e.target.closest('[data-action="preview-modal"]')) {
       e.preventDefault();
+      e.stopPropagation();
       
       const card = e.target.closest('.itinerary-card');
       const id = card?.dataset.itineraryId;
@@ -429,6 +378,7 @@ const ItineraryCard = (() => {
     // Back to build button
     if (e.target.closest('[data-action="back-to-build"]')) {
       e.preventDefault();
+      e.stopPropagation();
       
       Events.emit('action:back-to-build');
       return;
@@ -437,6 +387,7 @@ const ItineraryCard = (() => {
     // Wishlist button
     if (e.target.closest('[data-action="wishlist"]')) {
       e.preventDefault();
+      e.stopPropagation();
       
       const button = e.target.closest('[data-action="wishlist"]');
       const id = button.dataset.id;
@@ -450,17 +401,19 @@ const ItineraryCard = (() => {
     // Edit button (dashboard)
     if (e.target.closest('[data-action="edit-itinerary"]')) {
       e.preventDefault();
+      e.stopPropagation();
       
       const button = e.target.closest('[data-action="edit-itinerary"]');
       const id = button.dataset.id;
       
       if (id) {
+        // Navigate to edit page
         window.location.href = `#create?draft=${id}`;
       }
       return;
     }
     
-    // Card click (open modal) - only if not clicking a button
+    // Card click (open modal)
     const card = e.target.closest('.itinerary-card.enhanced');
     if (card && !e.target.closest('button')) {
       e.preventDefault();
@@ -478,7 +431,6 @@ const ItineraryCard = (() => {
   return {
     create,
     renderCards,
-    renderCardsUnwrapped,
     openModal,
     toggleWishlist,
     init
