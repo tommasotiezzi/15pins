@@ -264,6 +264,7 @@ const FeedPage = (() => {
 
   /**
    * Render itinerary cards
+   * FIXED: Use renderCardsUnwrapped to avoid nested grids
    */
   const renderCards = () => {
     const grid = document.getElementById('itinerary-grid');
@@ -286,9 +287,15 @@ const FeedPage = (() => {
       return;
     }
 
-    // Use ItineraryCard component to render
-    if (typeof ItineraryCard !== 'undefined') {
-      grid.innerHTML = ItineraryCard.renderCards(allItineraries, 'feed');
+    // Use ItineraryCard component to render WITHOUT wrapper
+    if (typeof ItineraryCard !== 'undefined' && ItineraryCard.renderCardsUnwrapped) {
+      // Use the unwrapped version to avoid nested grids
+      grid.innerHTML = ItineraryCard.renderCardsUnwrapped(allItineraries, 'feed');
+    } else if (typeof ItineraryCard !== 'undefined') {
+      // Fallback: render cards individually
+      grid.innerHTML = allItineraries.map(itinerary => 
+        ItineraryCard.create(itinerary, 'feed')
+      ).join('');
     } else {
       console.error('ItineraryCard component not loaded');
       grid.innerHTML = '<p>Error: Card component not loaded</p>';
