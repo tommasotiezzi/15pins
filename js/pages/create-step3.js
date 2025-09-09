@@ -1,6 +1,6 @@
 /**
  * Create Step 3 - Trip Details
- * Handles trip characteristics and travel essentials
+ * Database is the single source of truth - no local storage
  */
 
 const CreateStep3 = (() => {
@@ -15,14 +15,18 @@ const CreateStep3 = (() => {
     
     // Navigation
     Events.on('action:continue-to-review', handleContinueToReview);
+    Events.on('action:back-to-days', handleBackToDays);
   };
 
-  // ============= RENDER STEP =============
+  // ============= RENDER STEP (ASYNC) =============
   const render = async () => {
     const draftId = CreateController.getCurrentDraftId();
-    if (!draftId) return;
+    if (!draftId) {
+      Toast.error('No draft found');
+      return;
+    }
     
-    // Load existing data
+    // Load existing data from database
     await loadExistingData();
     
     // Setup listeners
@@ -118,8 +122,26 @@ const CreateStep3 = (() => {
       return;
     }
     
-    // Transition to Step 4
-    CreateController.handleStepTransition(3, 4);
+    // Save before continuing
+    try {
+      await saveStep();
+      // Use the controller's navigation method
+      await CreateController.navigateToStep(4);
+    } catch (error) {
+      Toast.error('Failed to save trip details');
+    }
+  };
+
+  const handleBackToDays = async () => {
+    // Save current state before going back
+    try {
+      await saveStep();
+    } catch (error) {
+      console.error('Error saving before navigation:', error);
+    }
+    
+    // Navigate back to step 2
+    await CreateController.navigateToStep(2);
   };
 
   // ============= MANUAL SAVE =============
@@ -135,7 +157,18 @@ const CreateStep3 = (() => {
     try {
       await saveStep();
       Toast.success('Trip details saved');
-      CreateController.markAsUnsaved(false); // Reset unsaved flag
+      
+      // Update UI to show saved state
+      const statusEl = document.getElementById('draft-status');
+      if (statusEl) {
+        statusEl.style.display = 'inline-flex';
+        statusEl.textContent = '✓ Saved';
+        statusEl.classList.remove('unsaved');
+        setTimeout(() => {
+          statusEl.style.display = 'none';
+        }, 2000);
+      }
+      
       updateCompletionChecklist();
       
     } catch (error) {
@@ -155,37 +188,63 @@ const CreateStep3 = (() => {
     fields.forEach(field => {
       if (characteristics[field]) {
         const radio = document.querySelector(`input[name="${field}"][value="${characteristics[field]}"]`);
-        if (radio) radio.checked = true;
+        if (radio) {
+          radio.checked = true;
+          // Add visual feedback
+          const parent = radio.closest('.radio-card-content');
+          if (parent) {
+            radio.closest('.characteristic-options')
+              ?.querySelectorAll('.radio-card-content')
+              .forEach(card => card.classList.remove('selected'));
+            parent.classList.add('selected');
+          }
+        }
       }
     });
   };
 
   const getCharacteristicsData = () => {
     return {
-      physical_demand: parseInt(document.querySelector('input[name="physical_demand"]:checked')?.value),
-      cultural_immersion: parseInt(document.querySelector('input[name="cultural_immersion"]:checked')?.value),
-      pace: parseInt(document.querySelector('input[name="pace"]:checked')?.value),
-      budget_level: parseInt(document.querySelector('input[name="budget_level"]:checked')?.value),
-      social_style: parseInt(document.querySelector('input[name="social_style"]:checked')?.value)
+      physical_demand: parseInt(document.querySelector('input[name="physical_demand"]:checked')?.value) || null,
+      cultural_immersion: parseInt(document.querySelector('input[name="cultural_immersion"]:checked')?.value) || null,
+      pace: parseInt(document.querySelector('input[name="pace"]:checked')?.value) || null,
+      budget_level: parseInt(document.querySelector('input[name="budget_level"]:checked')?.value) || null,
+      social_style: parseInt(document.querySelector('input[name="social_style"]:checked')?.value) || null
     };
   };
 
   const validateCharacteristics = () => {
     const data = getCharacteristicsData();
-    return Object.values(data).every(v => v && !isNaN(v));
+    return Object.values(data).every(v => v !== null && !isNaN(v));
   };
 
   // ============= TRANSPORTATION =============
   const populateTransportation = (data) => {
     if (data.getting_there) {
-      document.getElementById('getting_there').value = data.getting_there;
+      const field = document.getElementById('getting_there');
+      if (field) field.value = data.getting_there;
     }
     if (data.getting_around) {
-      document.getElementById('getting_around').value = data.getting_around;
+      const field = document.getElementById('getting_around');
+      if (field) field.value = data.getting_around;
     }
     if (data.local_transport_tips) {
-      document.getElementById('local_transport_tips').value = data.local_transport_tips;
+      const field = document.getElementById('local_transport_tips');
+      if (field) field.value = data.local_transport_tips;
     }
+    
+    // Open section if has content
+    const hasContent = data.getting_there || data.getting_around || data.local_transport_tips;
+    if (hasContent) {
+      const section = document.getElementById('transportation-section');
+      const content = section?.querySelector('.section-content');
+      if (content) {
+        content.style.display = 'block';
+        const icon = section.querySelector('.toggle-icon');
+        if (icon) icon.textContent = '▲';
+      }
+    }
+    
     updateEssentialIndicator('transportation-section');
   };
 
@@ -200,11 +259,26 @@ const CreateStep3 = (() => {
   // ============= ACCOMMODATION =============
   const populateAccommodation = (data) => {
     if (data.area_recommendations) {
-      document.getElementById('area_recommendations').value = data.area_recommendations;
+      const field = document.getElementById('area_recommendations');
+      if (field) field.value = data.area_recommendations;
     }
     if (data.booking_tips) {
-      document.getElementById('booking_tips').value = data.booking_tips;
+      const field = document.getElementById('booking_tips');
+      if (field) field.value = data.booking_tips;
     }
+    
+    // Open section if has content
+    const hasContent = data.area_recommendations || data.booking_tips;
+    if (hasContent) {
+      const section = document.getElementById('accommodation-section');
+      const content = section?.querySelector('.section-content');
+      if (content) {
+        content.style.display = 'block';
+        const icon = section.querySelector('.toggle-icon');
+        if (icon) icon.textContent = '▲';
+      }
+    }
+    
     updateEssentialIndicator('accommodation-section');
   };
 
@@ -219,12 +293,28 @@ const CreateStep3 = (() => {
   const populateTravelTips = (data) => {
     const fields = ['best_time_to_visit', 'visa_requirements', 'packing_suggestions', 'budget_breakdown', 'other_tips'];
     
+    let hasContent = false;
     fields.forEach(field => {
       if (data[field]) {
         const element = document.getElementById(field);
-        if (element) element.value = data[field];
+        if (element) {
+          element.value = data[field];
+          hasContent = true;
+        }
       }
     });
+    
+    // Open section if has content
+    if (hasContent) {
+      const section = document.getElementById('tips-section');
+      const content = section?.querySelector('.section-content');
+      if (content) {
+        content.style.display = 'block';
+        const icon = section.querySelector('.toggle-icon');
+        if (icon) icon.textContent = '▲';
+      }
+    }
+    
     updateEssentialIndicator('tips-section');
   };
 
@@ -245,6 +335,8 @@ const CreateStep3 = (() => {
     
     const content = section.querySelector('.section-content');
     const icon = section.querySelector('.toggle-icon');
+    
+    if (!content || !icon) return;
     
     if (content.style.display === 'none' || !content.style.display) {
       content.style.display = 'block';
@@ -270,10 +362,12 @@ const CreateStep3 = (() => {
     if (charCheck) {
       if (hasAllCharacteristics) {
         charCheck.classList.add('completed');
-        charCheck.querySelector('.check-icon').textContent = '✓';
+        const icon = charCheck.querySelector('.check-icon');
+        if (icon) icon.textContent = '✓';
       } else {
         charCheck.classList.remove('completed');
-        charCheck.querySelector('.check-icon').textContent = '○';
+        const icon = charCheck.querySelector('.check-icon');
+        if (icon) icon.textContent = '○';
       }
     }
     
@@ -307,20 +401,28 @@ const CreateStep3 = (() => {
       if (hasContent) {
         section.classList.add('has-content');
         checkItem.classList.add('completed');
-        checkItem.querySelector('.check-icon').textContent = '✓';
-        if (indicator) indicator.textContent = '✓ Added';
+        const icon = checkItem.querySelector('.check-icon');
+        if (icon) icon.textContent = '✓';
+        if (indicator) {
+          indicator.textContent = '✓ Added';
+          indicator.className = 'completion-indicator completed';
+        }
       } else {
         section.classList.remove('has-content');
         checkItem.classList.remove('completed');
-        checkItem.querySelector('.check-icon').textContent = '○';
-        if (indicator) indicator.textContent = '';
+        const icon = checkItem.querySelector('.check-icon');
+        if (icon) icon.textContent = '○';
+        if (indicator) {
+          indicator.textContent = '';
+          indicator.className = 'completion-indicator';
+        }
       }
     }
   };
 
   // ============= SETUP LISTENERS =============
   const setupCharacteristicListeners = () => {
-    document.querySelectorAll('input[type="radio"]').forEach(radio => {
+    document.querySelectorAll('.characteristics-section input[type="radio"]').forEach(radio => {
       radio.addEventListener('change', () => {
         CreateController.markAsUnsaved();
         updateCompletionChecklist();
@@ -349,15 +451,22 @@ const CreateStep3 = (() => {
       
       // Add character counter for longer fields
       if (textarea.maxLength && textarea.maxLength > 500) {
-        const counter = document.createElement('div');
-        counter.className = 'char-count';
-        counter.textContent = `0/${textarea.maxLength}`;
-        textarea.parentElement.appendChild(counter);
+        let counter = textarea.parentElement.querySelector('.char-count');
+        if (!counter) {
+          counter = document.createElement('div');
+          counter.className = 'char-count';
+          counter.textContent = `0/${textarea.maxLength}`;
+          textarea.parentElement.appendChild(counter);
+        }
         
-        textarea.addEventListener('input', () => {
+        // Update counter on input
+        const updateCounter = () => {
           counter.textContent = `${textarea.value.length}/${textarea.maxLength}`;
           counter.classList.toggle('warning', textarea.value.length > textarea.maxLength * 0.8);
-        });
+        };
+        
+        updateCounter(); // Initial count
+        textarea.addEventListener('input', updateCounter);
       }
     });
   };
