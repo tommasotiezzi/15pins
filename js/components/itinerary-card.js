@@ -18,8 +18,7 @@ const ItineraryCard = (() => {
     return `
       <div class="itinerary-card enhanced" 
            data-itinerary-id="${itinerary.id || 'preview'}"
-           data-context="${context}"
-           onclick="ItineraryCard.openModal('${itinerary.id || 'preview'}', '${context}')">
+           data-context="${context}">
         
         ${renderCardImage(itinerary)}
         
@@ -108,8 +107,13 @@ const ItineraryCard = (() => {
    * Render characteristics as subtle badges
    */
   const renderCharacteristics = (itinerary) => {
-    // Handle both draft_characteristics and characteristics
-    const chars = itinerary.characteristics || itinerary.draft_characteristics || {};
+    // Try both field names - API might strip 'draft_' prefix
+    const chars = itinerary.characteristics || 
+                  itinerary.draft_characteristics || 
+                  {};
+    
+    console.log('Card received itinerary:', itinerary);
+    console.log('Looking for characteristics, found:', chars);
     
     if (!chars || Object.keys(chars).length === 0) {
       return '<div class="card-characteristics-empty">No characteristics set</div>';
@@ -127,12 +131,15 @@ const ItineraryCard = (() => {
       .filter(spec => chars[spec.key])
       .map(spec => {
         const value = chars[spec.key];
+        console.log(`Creating badge for ${spec.key}: ${value}`);
         return `
           <span class="char-badge">
             ${spec.icon} ${spec.labels[value - 1]}
           </span>
         `;
       });
+    
+    console.log('Created badges:', badges);
     
     return badges.length > 0 ? 
       `<div class="card-characteristics-subtle">${badges.join('')}</div>` : 
@@ -282,6 +289,44 @@ const ItineraryCard = (() => {
    */
   const init = () => {
     console.log('ItineraryCard component initialized');
+    
+    // Set up delegated event listeners
+    document.addEventListener('click', (e) => {
+      // Handle card clicks
+      const card = e.target.closest('.itinerary-card.enhanced');
+      if (card && !e.target.closest('button')) {
+        const id = card.dataset.itineraryId;
+        const context = card.dataset.context;
+        openModal(id, context);
+        return;
+      }
+      
+      // Handle preview modal button
+      if (e.target.closest('[data-action="preview-modal"]')) {
+        e.stopPropagation();
+        openModal('preview', 'preview');
+        return;
+      }
+      
+      // Handle continue editing button
+      if (e.target.closest('[data-action="back-to-build"]')) {
+        e.stopPropagation();
+        console.log('Continue editing clicked');
+        Events.emit('create:continue-editing');
+        // Also emit navigation event
+        Events.emit('action:back-to-build');
+        return;
+      }
+      
+      // Handle wishlist button
+      if (e.target.closest('[data-action="wishlist"]')) {
+        e.stopPropagation();
+        const button = e.target.closest('[data-action="wishlist"]');
+        const id = button.dataset.id;
+        toggleWishlist(id);
+        return;
+      }
+    });
   };
 
   // Public API

@@ -292,17 +292,12 @@ const CreateStep4 = (() => {
 
   // ============= RENDER MARKETPLACE CARD =============
   const renderMarketplaceCard = (draft, currentUser) => {
-    // Calculate stats for the card
-    let totalStops = 0;
-    if (draft.days) {
-      draft.days.forEach(day => {
-        if (day.stops) {
-          totalStops += day.stops.length;
-        }
-      });
-    }
+    // Debug what we're actually getting from the database
+    console.log('Full draft object from DB:', draft);
+    console.log('Draft keys:', Object.keys(draft));
     
     // Transform draft to match itinerary structure for the card
+    // The draft object likely has the fields without 'draft_' prefix after API call
     const itineraryPreview = {
       id: 'preview',
       title: draft.title || 'Untitled Itinerary',
@@ -312,20 +307,28 @@ const CreateStep4 = (() => {
       price_tier: draft.price_tier || 9,
       cover_image_url: draft.cover_image_url || '',
       days: draft.days || [],
+      // Try both field names since API might strip the 'draft_' prefix
       characteristics: draft.characteristics || {},
-      transportation: draft.transportation || null,
-      accommodation: draft.accommodation || null,
-      travel_tips: draft.travel_tips || null,
+      draft_characteristics: draft.draft_characteristics || draft.characteristics || {},
+      transportation: draft.transportation || {},
+      draft_transportation: draft.draft_transportation || draft.transportation || {},
+      accommodation: draft.accommodation || {},
+      draft_accommodation: draft.draft_accommodation || draft.accommodation || {},
+      travel_tips: draft.travel_tips || {},
+      draft_travel_tips: draft.draft_travel_tips || draft.travel_tips || {},
       total_sales: 0,
       view_count: 0,
       creator: {
         username: currentUser?.username || currentUser?.profile?.username || 'You',
-        avatar_url: currentUser?.avatar_url || currentUser?.profile?.avatar_url || 'https://i.pravatar.cc/32',
+        avatar_url: currentUser?.avatar_url || currentUser?.profile?.avatar_url || '/images/default-avatar.png',
         bio: currentUser?.bio || currentUser?.profile?.bio || '',
-        trip_count: 1  // First trip
+        trip_count: 1
       },
       context: 'preview'
     };
+    
+    console.log('Created itineraryPreview with characteristics:', itineraryPreview.characteristics);
+    console.log('Created itineraryPreview with draft_characteristics:', itineraryPreview.draft_characteristics);
     
     // Store for modal access
     window.CreatePage = window.CreatePage || {};
